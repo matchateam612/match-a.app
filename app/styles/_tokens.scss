@@ -1,0 +1,59 @@
+$breakpoint-mobile: 600px;
+$content-max-width: 800px;
+$copy-max-width: 440px;
+$page-padding-desktop: 120px 60px;
+$page-padding-mobile: 48px 24px;
+$radius-pill: 999px;
+$transition-base: 0.2s ease;
+$shadow-soft: 0 8px 40px rgba(27, 28, 28, 0.04);
+$shadow-top-bar: 0 8px 32px rgba(27, 28, 28, 0.04);
+$shadow-bottom-bar: 0 -8px 40px rgba(27, 28, 28, 0.06);
+$bottom-nav-height: 104px;
+
+@mixin theme-light {
+  --color-page-background: #fafafa;
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f5f3f3;
+  --color-surface-tertiary: #efeded;
+  --color-text-primary: #000000;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #54433f;
+  --color-button-primary-hover: #383838;
+  --color-button-secondary-hover: #f2f2f2;
+  --color-border-subtle: #ebebeb;
+  --color-border-strong: #dac1bc;
+  --color-brand-primary: #934937;
+  --color-brand-primary-strong: #753322;
+  --color-brand-primary-soft: #ffa18a;
+  --color-brand-primary-fixed: #ffdad2;
+  --color-brand-secondary: #0050d7;
+  --color-brand-secondary-strong: #003da9;
+  --color-brand-tertiary: #00696f;
+  --color-brand-tertiary-soft: #7df4fe;
+  --color-brand-tertiary-surface: #4dcad3;
+  --color-status-live: #934937;
+}
+
+@mixin theme-dark {
+  --color-page-background: #000000;
+  --color-surface-primary: #000000;
+  --color-surface-secondary: #141414;
+  --color-surface-tertiary: #1a1a1a;
+  --color-text-primary: #ededed;
+  --color-text-secondary: #999999;
+  --color-text-tertiary: #c9b2ac;
+  --color-button-primary-hover: #cccccc;
+  --color-button-secondary-hover: #1a1a1a;
+  --color-border-subtle: #1a1a1a;
+  --color-border-strong: #54433f;
+  --color-brand-primary: #ffb4a2;
+  --color-brand-primary-strong: #ffa18a;
+  --color-brand-primary-soft: #ffdad2;
+  --color-brand-primary-fixed: #3c0801;
+  --color-brand-secondary: #b4c5ff;
+  --color-brand-secondary-strong: #dbe1ff;
+  --color-brand-tertiary: #7df4fe;
+  --color-brand-tertiary-soft: #4dcad3;
+  --color-brand-tertiary-surface: #005257;
+  --color-status-live: #ffb4a2;
+}
