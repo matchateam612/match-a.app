@@ -28,10 +28,3 @@ export type MentalityProgress = {
   currentStepId: string;
   completedStepIds: string[];
 };
-
-export type UserInfo = {
-  basic_info?: Record<string, unknown>;
-  mentality?: MentalityDraft;
-  mentality_progress?: MentalityProgress;
-  [key: string]: unknown;
-};

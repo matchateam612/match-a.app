@@ -1,8 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo } from "react";
 
 import styles from "../../1-basics/page.module.scss";
+import {
+  useClientReady
+} from "@/app/onboarding/_shared/onboarding-storage";
+import {
+  readStoredProgressValue,
+  readStoredUserInfo,
+  writeStoredProgressValue,
+  writeStoredUserInfo,
+} from "@/app/onboarding/_shared/onboarding-persistence";
+import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
+import {
+  useOnboardingSectionState,
+} from "@/app/onboarding/_shared/use-onboarding-section-state";
+import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
+import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { upsertUserPrivateInfo } from "@/lib/supabase/user-private-info";
 import {
@@ -13,7 +28,7 @@ import {
 } from "./mentality-data";
 import { getFirstBranchStepId, getMentalityFlow, type MentalityStepId } from "./mentality-flow";
 import { MentalityLayout } from "./mentality-layout";
-import type { MentalityDraft, MentalityProgress, RelationshipIntent, UserInfo } from "./mentality-types";
+import type { MentalityDraft, MentalityProgress, RelationshipIntent } from "./mentality-types";
 import { CasualBoundariesStep } from "./steps/casual-boundaries-step";
 import { CasualFrequencyStep } from "./steps/casual-frequency-step";
 import { OpenClarityStep } from "./steps/open-clarity-step";
@@ -35,18 +50,6 @@ const emptyStoredState: StoredMentalityState = {
   hasSavedDraft: false,
   userInfo: {},
 };
-
-function subscribeToClientReady() {
-  return () => {};
-}
-
-function getServerClientReadySnapshot() {
-  return false;
-}
-
-function getClientReadySnapshot() {
-  return true;
-}
 
 function isMentalityStepId(value: string): value is MentalityStepId {
   return [
@@ -90,17 +93,8 @@ function readStoredState(): StoredMentalityState {
     return emptyStoredState;
   }
 
-  const rawUserInfo = window.localStorage.getItem(USER_INFO_STORAGE_KEY);
-  const rawCurrentStepId = window.localStorage.getItem(MENTALITY_STEP_STORAGE_KEY);
-  let userInfo: UserInfo = {};
-
-  if (rawUserInfo) {
-    try {
-      userInfo = JSON.parse(rawUserInfo) as UserInfo;
-    } catch {
-      window.localStorage.removeItem(USER_INFO_STORAGE_KEY);
-    }
-  }
+  const rawCurrentStepId = readStoredProgressValue(MENTALITY_STEP_STORAGE_KEY);
+  const userInfo: UserInfo = readStoredUserInfo(USER_INFO_STORAGE_KEY);
 
   const draft: MentalityDraft = {
     ...initialDraft,
@@ -139,14 +133,6 @@ function readStoredState(): StoredMentalityState {
     hasSavedDraft: Boolean(userInfo.mentality),
     userInfo,
   };
-}
-
-function getDraftStatus(hasSavedDraft: boolean) {
-  if (hasSavedDraft) {
-    return "Saved locally on this device as you go.";
-  }
-
-  return "Your answers will be saved locally on this device.";
 }
 
 function hasDraftContent(draft: MentalityDraft) {
@@ -196,11 +182,7 @@ function toggleValue(values: string[], value: string) {
 }
 
 export function MentalityOnboarding() {
-  const isClientReady = useSyncExternalStore(
-    subscribeToClientReady,
-    getClientReadySnapshot,
-    getServerClientReadySnapshot,
-  );
+  const isClientReady = useClientReady();
 
   if (!isClientReady) {
     return (
@@ -228,12 +210,72 @@ export function MentalityOnboarding() {
 }
 
 function MentalityOnboardingClient() {
-  const [storedState] = useState(readStoredState);
-  const [draft, setDraft] = useState<MentalityDraft>(storedState.draft);
-  const [progress, setProgress] = useState<MentalityProgress>(storedState.progress);
-  const [isSavingSection, setIsSavingSection] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [saveError, setSaveError] = useState("");
+  const buildUserInfo = useCallback(
+    ({
+      draft,
+      progress,
+      storedUserInfo,
+    }: {
+      draft: MentalityDraft;
+      progress: MentalityProgress;
+      storedUserInfo: UserInfo;
+    }) => ({
+      ...storedUserInfo,
+      mentality: draft,
+      mentality_progress: progress,
+    }),
+    [],
+  );
+
+  const persistState = useCallback(
+    ({
+      draft,
+      progress,
+      userInfo,
+    }: {
+      draft: MentalityDraft;
+      progress: MentalityProgress;
+      userInfo: UserInfo;
+    }) => {
+      const sanitizedProgress = sanitizeProgress(draft, progress);
+
+      if (
+        sanitizedProgress.branch !== progress.branch ||
+        sanitizedProgress.currentStepId !== progress.currentStepId ||
+        sanitizedProgress.completedStepIds.join("|") !== progress.completedStepIds.join("|")
+      ) {
+        return;
+      }
+
+      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
+      writeStoredProgressValue(MENTALITY_STEP_STORAGE_KEY, sanitizedProgress.currentStepId);
+    },
+    [],
+  );
+
+  const {
+    draft,
+    setDraft,
+    progress,
+    setProgress,
+    userInfo,
+    isSavingSection,
+    setIsSavingSection,
+    saveMessage,
+    setSaveMessage,
+    saveError,
+    setSaveError,
+    draftStatus,
+  } = useOnboardingSectionState({
+    readStoredState,
+    hasDraftContent: (draft) => hasDraftContent(draft),
+    buildUserInfo,
+    persistState,
+  });
+  const { clearSaveFeedback } = useSectionSaveFeedback({
+    setSaveError,
+    setSaveMessage,
+  });
 
   const flow = useMemo(() => getMentalityFlow(draft.relationshipIntent), [draft.relationshipIntent]);
   const currentStepIndex = Math.max(
@@ -243,39 +285,6 @@ function MentalityOnboardingClient() {
   const currentStep = flow[currentStepIndex] ?? flow[0];
   const isLastStep = currentStepIndex === flow.length - 1;
   const canContinue = currentStep?.isComplete(draft) ?? false;
-
-  const userInfo: UserInfo = useMemo(
-    () => ({
-      ...storedState.userInfo,
-      mentality: draft,
-      mentality_progress: progress,
-    }),
-    [draft, progress, storedState.userInfo],
-  );
-
-  useEffect(() => {
-    const sanitizedProgress = sanitizeProgress(draft, progress);
-
-    if (
-      sanitizedProgress.branch !== progress.branch ||
-      sanitizedProgress.currentStepId !== progress.currentStepId ||
-      sanitizedProgress.completedStepIds.join("|") !== progress.completedStepIds.join("|")
-    ) {
-      setProgress(sanitizedProgress);
-      return;
-    }
-
-    const nextUserInfo = {
-      ...userInfo,
-      mentality: draft,
-      mentality_progress: sanitizedProgress,
-    };
-
-    window.localStorage.setItem(USER_INFO_STORAGE_KEY, JSON.stringify(nextUserInfo));
-    window.localStorage.setItem(MENTALITY_STEP_STORAGE_KEY, sanitizedProgress.currentStepId);
-  }, [draft, progress, userInfo]);
-
-  const draftStatus = getDraftStatus(storedState.hasSavedDraft || hasDraftContent(draft));
 
   function markCurrentStepComplete() {
     setProgress((current) => ({
@@ -291,8 +300,7 @@ function MentalityOnboardingClient() {
       return;
     }
 
-    setSaveError("");
-    setSaveMessage("");
+    clearSaveFeedback();
     markCurrentStepComplete();
     const nextStep = flow[currentStepIndex + 1];
 
@@ -311,8 +319,7 @@ function MentalityOnboardingClient() {
       return;
     }
 
-    setSaveError("");
-    setSaveMessage("");
+    clearSaveFeedback();
     const previousStep = flow[currentStepIndex - 1];
 
     if (!previousStep) {
@@ -326,8 +333,7 @@ function MentalityOnboardingClient() {
   }
 
   function updateRelationshipIntent(value: RelationshipIntent) {
-    setSaveError("");
-    setSaveMessage("");
+    clearSaveFeedback();
 
     if (draft.relationshipIntent === value) {
       setDraft((current) => ({ ...current, relationshipIntent: value }));
@@ -368,15 +374,12 @@ function MentalityOnboardingClient() {
         mentality_progress: finalProgress,
       });
 
-      window.localStorage.setItem(
-        USER_INFO_STORAGE_KEY,
-        JSON.stringify({
-          ...userInfo,
-          mentality: draft,
-          mentality_progress: finalProgress,
-        }),
-      );
-      window.localStorage.setItem(MENTALITY_STEP_STORAGE_KEY, finalProgress.currentStepId);
+      writeStoredUserInfo(USER_INFO_STORAGE_KEY, {
+        ...userInfo,
+        mentality: draft,
+        mentality_progress: finalProgress,
+      });
+      writeStoredProgressValue(MENTALITY_STEP_STORAGE_KEY, finalProgress.currentStepId);
       setProgress(finalProgress);
       setSaveMessage("Mentality answers saved. Your user_info row is up to date.");
     } catch (error) {
@@ -495,11 +498,12 @@ function MentalityOnboardingClient() {
       totalSteps={flow.length}
       draftStatus={draftStatus}
       status={
-        saveError ? (
-          <p className={`${styles.statusMessage} ${styles.statusError}`}>{saveError}</p>
-        ) : saveMessage ? (
-          <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{saveMessage}</p>
-        ) : null
+        <OnboardingSectionStatus
+          errorMessage={saveError}
+          successMessage={saveMessage}
+          errorClassName={`${styles.statusMessage} ${styles.statusError}`}
+          successClassName={`${styles.statusMessage} ${styles.statusSuccess}`}
+        />
       }
       footer={
         <>

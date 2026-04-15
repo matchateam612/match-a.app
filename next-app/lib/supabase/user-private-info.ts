@@ -1,5 +1,5 @@
 import { getSupabaseBrowserClient } from "./client";
-import type { UserInfo } from "@/app/onboarding/1-basics/_components/basic-info-types";
+import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 
 export async function upsertUserPrivateInfo(userId: string, userInfo: UserInfo) {
   const supabase = getSupabaseBrowserClient();
