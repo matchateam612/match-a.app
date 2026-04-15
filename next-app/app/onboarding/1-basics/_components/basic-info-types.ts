@@ -43,3 +43,8 @@ export type BasicInfoDraft = {
   ethnicity: EthnicityOption | "";
   preferredEthnicities: PreferredEthnicityOption[];
 };
+
+export type UserInfo = {
+  basic_info?: BasicInfoDraft;
+  [key: string]: unknown;
+};

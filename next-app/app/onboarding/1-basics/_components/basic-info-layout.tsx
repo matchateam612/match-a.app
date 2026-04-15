@@ -9,6 +9,7 @@ type BasicInfoLayoutProps = {
   currentStep: number;
   draftStatus: string;
   footer: ReactNode;
+  status?: ReactNode;
 };
 
 export function BasicInfoLayout({
@@ -16,6 +17,7 @@ export function BasicInfoLayout({
   currentStep,
   draftStatus,
   footer,
+  status,
 }: BasicInfoLayoutProps) {
   return (
     <div className={styles.page}>
@@ -78,6 +80,7 @@ export function BasicInfoLayout({
             </div>
 
             <div className={styles.questionBlock}>{children}</div>
+            {status}
           </section>
         </div>
       </main>

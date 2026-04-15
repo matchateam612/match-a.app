@@ -423,6 +423,24 @@
   font-weight: 800;
 }
 
+.statusMessage {
+  margin-bottom: 28px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.statusError {
+  background: color-mix(in srgb, #ffdad6 72%, transparent);
+  color: #7f1d1d;
+}
+
+.statusSuccess {
+  background: color-mix(in srgb, var(--color-brand-tertiary-soft) 32%, var(--color-surface-secondary));
+  color: color-mix(in srgb, var(--color-brand-tertiary) 88%, var(--color-text-primary));
+}
+
 .footer {
   position: fixed;
   right: 0;

@@ -6,7 +6,8 @@ import type {
   PreferredEthnicityOption,
 } from "./basic-info-types";
 
-export const STORAGE_KEY = "matcha.onboarding.basic-info";
+export const USER_INFO_STORAGE_KEY = "user_info";
+export const BASIC_INFO_STEP_STORAGE_KEY = "user_info.basic_info.current_step";
 export const TOTAL_SECTIONS = 4;
 export const TOTAL_STEPS = 5;
 

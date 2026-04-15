@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import styles from "../page.module.scss";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { upsertUserPrivateInfo } from "@/lib/supabase/user-private-info";
 import { BasicInfoLayout } from "./basic-info-layout";
-import { initialDraft, STORAGE_KEY, TOTAL_STEPS } from "./basic-info-data";
-import type { BasicInfoDraft, PreferredEthnicityOption } from "./basic-info-types";
+import {
+  BASIC_INFO_STEP_STORAGE_KEY,
+  initialDraft,
+  TOTAL_STEPS,
+  USER_INFO_STORAGE_KEY,
+} from "./basic-info-data";
+import type { BasicInfoDraft, PreferredEthnicityOption, UserInfo } from "./basic-info-types";
 import { AgeStep } from "./steps/age-step";
 import { EthnicityStep } from "./steps/ethnicity-step";
 import { GenderIdentityStep } from "./steps/gender-identity-step";
@@ -16,12 +23,14 @@ type StoredBasicInfoState = {
   currentStep: number;
   draft: BasicInfoDraft;
   hasSavedDraft: boolean;
+  userInfo: UserInfo;
 };
 
 const emptyStoredState: StoredBasicInfoState = {
   currentStep: 0,
   draft: initialDraft,
   hasSavedDraft: false,
+  userInfo: {},
 };
 
 function subscribeToClientReady() {
@@ -45,35 +54,67 @@ function readStoredState(): StoredBasicInfoState {
     return emptyStoredState;
   }
 
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const rawUserInfo = window.localStorage.getItem(USER_INFO_STORAGE_KEY);
+  const rawCurrentStep = window.localStorage.getItem(BASIC_INFO_STEP_STORAGE_KEY);
+  const legacyBasicInfo = window.localStorage.getItem("matcha.onboarding.basic-info");
 
-  if (!raw) {
-    return emptyStoredState;
+  let userInfo: UserInfo = {};
+
+  if (rawUserInfo) {
+    try {
+      userInfo = JSON.parse(rawUserInfo) as UserInfo;
+    } catch {
+      window.localStorage.removeItem(USER_INFO_STORAGE_KEY);
+    }
   }
 
-  try {
-    const parsed = JSON.parse(raw) as Partial<BasicInfoDraft> & {
-      currentStep?: number;
-    };
+  if (!userInfo.basic_info && legacyBasicInfo) {
+    try {
+      const parsedLegacy = JSON.parse(legacyBasicInfo) as Partial<BasicInfoDraft> & {
+        currentStep?: number;
+      };
 
-    return {
-      currentStep:
-        typeof parsed.currentStep === "number" && isValidStep(parsed.currentStep)
-          ? parsed.currentStep
-          : 0,
-      draft: {
-        ...initialDraft,
-        ...parsed,
-        preferredEthnicities: Array.isArray(parsed.preferredEthnicities)
-          ? parsed.preferredEthnicities
-          : initialDraft.preferredEthnicities,
-      },
-      hasSavedDraft: true,
-    };
-  } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return emptyStoredState;
+      userInfo = {
+        ...userInfo,
+        basic_info: {
+          ...initialDraft,
+          ...parsedLegacy,
+          preferredEthnicities: Array.isArray(parsedLegacy.preferredEthnicities)
+            ? parsedLegacy.preferredEthnicities
+            : initialDraft.preferredEthnicities,
+        },
+      };
+
+      if (typeof parsedLegacy.currentStep === "number" && !rawCurrentStep) {
+        window.localStorage.setItem(
+          BASIC_INFO_STEP_STORAGE_KEY,
+          String(parsedLegacy.currentStep),
+        );
+      }
+
+      window.localStorage.setItem(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+      window.localStorage.removeItem("matcha.onboarding.basic-info");
+    } catch {
+      window.localStorage.removeItem("matcha.onboarding.basic-info");
+    }
   }
+
+  const draft = {
+    ...initialDraft,
+    ...userInfo.basic_info,
+    preferredEthnicities: Array.isArray(userInfo.basic_info?.preferredEthnicities)
+      ? userInfo.basic_info.preferredEthnicities
+      : initialDraft.preferredEthnicities,
+  };
+
+  const parsedCurrentStep = rawCurrentStep ? Number(rawCurrentStep) : 0;
+
+  return {
+    currentStep: isValidStep(parsedCurrentStep) ? parsedCurrentStep : 0,
+    draft,
+    hasSavedDraft: Boolean(userInfo.basic_info),
+    userInfo,
+  };
 }
 
 function isStepComplete(step: number, draft: BasicInfoDraft) {
@@ -158,16 +199,21 @@ function BasicInfoOnboardingClient() {
   const [storedState] = useState(readStoredState);
   const [draft, setDraft] = useState<BasicInfoDraft>(storedState.draft);
   const [currentStep, setCurrentStep] = useState(storedState.currentStep);
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const userInfo: UserInfo = useMemo(
+    () => ({
+      ...storedState.userInfo,
+      basic_info: draft,
+    }),
+    [draft, storedState.userInfo],
+  );
 
   useEffect(() => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ...draft,
-        currentStep,
-      }),
-    );
-  }, [currentStep, draft]);
+    window.localStorage.setItem(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+    window.localStorage.setItem(BASIC_INFO_STEP_STORAGE_KEY, String(currentStep));
+  }, [currentStep, userInfo]);
 
   const draftStatus = getDraftStatus(
     storedState.hasSavedDraft || hasDraftContent(draft, currentStep),
@@ -187,10 +233,14 @@ function BasicInfoOnboardingClient() {
       return;
     }
 
+    setSaveError("");
+    setSaveMessage("");
     setCurrentStep((step) => Math.min(step + 1, TOTAL_STEPS - 1));
   }
 
   function goBack() {
+    setSaveError("");
+    setSaveMessage("");
     setCurrentStep((step) => Math.max(step - 1, 0));
   }
 
@@ -225,6 +275,36 @@ function BasicInfoOnboardingClient() {
         : `${draft.preferredEthnicities.length} preference${
             draft.preferredEthnicities.length === 1 ? "" : "s"
           } selected`;
+
+  async function finishBasicInfo() {
+    if (!canContinue || isSavingSection) {
+      return;
+    }
+
+    setIsSavingSection(true);
+    setSaveError("");
+    setSaveMessage("");
+
+    try {
+      const user = await getCurrentUser();
+
+      if (!user) {
+        throw new Error("Please sign in before finishing this section.");
+      }
+
+      await upsertUserPrivateInfo(user.id, userInfo);
+      window.localStorage.setItem(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+      setSaveMessage("Basic info saved. Your user_info row is up to date.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error && error.message
+          ? error.message
+          : "We couldn't save your basic info right now.",
+      );
+    } finally {
+      setIsSavingSection(false);
+    }
+  }
 
   let stepContent = (
     <AgeStep age={draft.age} onChange={(value) => updateDraft("age", value)} />
@@ -268,23 +348,34 @@ function BasicInfoOnboardingClient() {
     <BasicInfoLayout
       currentStep={currentStep}
       draftStatus={draftStatus}
+      status={
+        saveError ? (
+          <p className={`${styles.statusMessage} ${styles.statusError}`}>{saveError}</p>
+        ) : saveMessage ? (
+          <p className={`${styles.statusMessage} ${styles.statusSuccess}`}>{saveMessage}</p>
+        ) : null
+      }
       footer={
         <>
           <button
             className={styles.backButton}
             type="button"
             onClick={goBack}
-            disabled={currentStep === 0}
+            disabled={currentStep === 0 || isSavingSection}
           >
             Back
           </button>
           <button
             className={styles.nextButton}
             type="button"
-            onClick={goNext}
-            disabled={!canContinue}
+            onClick={isLastStep ? finishBasicInfo : goNext}
+            disabled={!canContinue || isSavingSection}
           >
-            {isLastStep ? "Finish basic info" : "Next"}
+            {isSavingSection
+              ? "Saving..."
+              : isLastStep
+                ? "Finish basic info"
+                : "Next"}
           </button>
         </>
       }
