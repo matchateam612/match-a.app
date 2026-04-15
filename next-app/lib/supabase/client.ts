@@ -11,7 +11,7 @@ export function getSupabaseBrowserClient() {
 
   const { url, anonKey } = getSupabaseBrowserEnv();
 
-  browserClient = createClient("https://dnkfrxavhtcvruclkcmp.supabase.co", "sb_publishable_RodGIQugdUqI94XDqCe6FQ_9BkZ1XIP", {
+  browserClient = createClient(url, anonKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true,

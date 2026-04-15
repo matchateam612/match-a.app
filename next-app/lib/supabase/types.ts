@@ -9,7 +9,7 @@ export type MatchRecord = {
   user2_match_status: MatchStatus;
 };
 
-export type SignInPayload = {
+export type EmailPasswordAuthPayload = {
   email: string;
   password: string;
 };

@@ -1,0 +1,94 @@
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>org_name</th>
+      <th>pres_name</th>
+      <th>pres_mail</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Andrew McDonough B+ Foundation at UC San Diego...</td>
+      <td>Alan Lopez Patron</td>
+      <td>alopezpatron@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>333Jugglers</td>
+      <td>Eric Gan</td>
+      <td>ergan@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>4N01 Dance Team</td>
+      <td>Eva York</td>
+      <td>eyork@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>528 @UC San Diego</td>
+      <td>Aran Zakeri</td>
+      <td>azakeri@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>A Lutheran Ministry Social (ALMS)</td>
+      <td>Kevin Zhang</td>
+      <td>kez015@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>95</th>
+      <td>Black Triton Association</td>
+      <td>Chidiebere Agunanne</td>
+      <td>cagunanne@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>96</th>
+      <td>Bleeding Hearts Poetry Collective</td>
+      <td>America Meza</td>
+      <td>a7meza@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>97</th>
+      <td>Blind Snakes Disabled Students Empowerment Group</td>
+      <td>Student Information Not Displayed!</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>98</th>
+      <td>Blockchain at UC San Diego</td>
+      <td>Yeunwook Kim</td>
+      <td>yek023@ucsd.edu</td>
+    </tr>
+    <tr>
+      <th>99</th>
+      <td>Blossom Together at UC San Diego</td>
+      <td>Yoonseop Choi</td>
+      <td>yoc021@ucsd.edu</td>
+    </tr>
+  </tbody>
+</table>
+<p>100 rows × 3 columns</p>
+</div>

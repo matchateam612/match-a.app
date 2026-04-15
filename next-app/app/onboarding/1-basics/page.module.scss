@@ -1,0 +1,547 @@
+@use "../../styles/tokens" as *;
+@use "../../styles/mixins" as *;
+
+.page {
+  min-height: 100dvh;
+  padding-bottom: calc(#{$bottom-nav-height} + 36px);
+  background:
+    radial-gradient(circle at 84% 10%, rgba(125, 244, 254, 0.18), transparent 20%),
+    radial-gradient(circle at 12% 12%, rgba(255, 161, 138, 0.28), transparent 26%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-secondary) 72%, transparent),
+      transparent 28%
+    ),
+    var(--color-page-background);
+  color: var(--color-text-primary);
+}
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-strong) 44%, transparent);
+  background: color-mix(in srgb, var(--color-surface-primary) 82%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow: $shadow-top-bar;
+}
+
+.topBarInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 18px 20px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  font-family: var(--font-geist-sans);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.brandName {
+  font-family: var(--font-geist-sans);
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.helpText {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.main {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 20px 0;
+}
+
+.layout {
+  display: grid;
+  gap: 24px;
+}
+
+.heroCard,
+.panelCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--color-surface-primary) 90%, transparent);
+  box-shadow: $shadow-soft;
+}
+
+.heroCard {
+  padding: 28px 24px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 244, 254, 0.22), transparent 26%),
+    radial-gradient(circle at 14% 14%, rgba(255, 161, 138, 0.24), transparent 24%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-secondary) 80%, transparent),
+      var(--color-surface-primary)
+    );
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 55%, transparent);
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-surface-primary) 82%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-geist-sans);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eyebrowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-status-live);
+  box-shadow: 0 0 0 8px rgba(147, 73, 55, 0.12);
+}
+
+.heroTitle {
+  max-width: 12ch;
+  font-family: var(--font-geist-sans);
+  font-size: clamp(2.5rem, 9vw, 4.8rem);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.heroHighlight {
+  color: var(--color-brand-primary);
+  font-style: italic;
+}
+
+.heroCopy {
+  max-width: 34ch;
+  color: var(--color-text-tertiary);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.heroBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px 18px 18px 6px;
+  background: color-mix(in srgb, var(--color-surface-primary) 88%, transparent);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(27, 28, 28, 0.05);
+}
+
+.heroBadgeAccent {
+  background: linear-gradient(135deg, var(--color-brand-tertiary-soft), var(--color-brand-tertiary-surface));
+  color: #083336;
+}
+
+.panelCard {
+  padding: 24px 20px 0;
+}
+
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.progressTrack {
+  display: flex;
+  gap: 8px;
+}
+
+.progressSegment {
+  height: 8px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-border-strong) 32%, transparent);
+  transition:
+    background-color $transition-base,
+    transform $transition-base;
+}
+
+.progressSegment:nth-child(1),
+.progressSegment:nth-child(2) {
+  width: 54px;
+}
+
+.progressSegment:nth-child(3),
+.progressSegment:nth-child(4) {
+  width: 78px;
+}
+
+.progressSegment:nth-child(5) {
+  width: 42px;
+}
+
+.progressSegmentActive {
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+}
+
+.questionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 28px;
+}
+
+.questionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.questionLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.questionTitle {
+  font-family: var(--font-geist-sans);
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.questionCopy {
+  max-width: 34rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.7;
+}
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.input,
+.numberInput {
+  width: 100%;
+  min-height: 60px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  font: inherit;
+  transition:
+    border-color $transition-base,
+    box-shadow $transition-base,
+    background-color $transition-base;
+}
+
+.input::placeholder,
+.numberInput::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 48%, transparent);
+}
+
+.input:focus,
+.numberInput:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-brand-secondary) 28%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand-secondary) 12%, transparent);
+  background: color-mix(in srgb, var(--color-surface-primary) 86%, var(--color-surface-secondary));
+}
+
+.inlineLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.helper {
+  color: var(--color-text-tertiary);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.ageWrap {
+  display: grid;
+  gap: 16px;
+}
+
+.ageCard {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 84%, transparent);
+}
+
+.ageValue {
+  font-family: var(--font-geist-sans);
+  font-size: clamp(2.4rem, 8vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.chipGrid,
+.multiGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chip,
+.multiChip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 112px;
+  padding: 20px 18px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 46%, transparent);
+  border-radius: 22px 22px 22px 8px;
+  background: color-mix(in srgb, var(--color-surface-primary) 76%, transparent);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform $transition-base,
+    border-color $transition-base,
+    background-color $transition-base,
+    box-shadow $transition-base;
+}
+
+.chip:hover,
+.multiChip:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-brand-primary) 38%, transparent);
+}
+
+.chipActive,
+.multiChipActive {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(147, 73, 55, 0.18);
+}
+
+.chipTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.chipCopy {
+  color: inherit;
+  opacity: 0.78;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.splitCard {
+  display: grid;
+  gap: 18px;
+}
+
+.stackCard {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 84%, transparent);
+}
+
+.selectionSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-brand-primary-fixed) 64%, transparent);
+  color: var(--color-brand-primary);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  border-top: 1px solid color-mix(in srgb, var(--color-border-strong) 44%, transparent);
+  background: color-mix(in srgb, var(--color-surface-primary) 82%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow: $shadow-bottom-bar;
+}
+
+.footerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 20px 20px;
+}
+
+.backButton,
+.nextButton {
+  border: 0;
+  font: inherit;
+  transition:
+    transform $transition-base,
+    filter $transition-base,
+    opacity $transition-base;
+}
+
+.backButton {
+  min-height: 54px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.nextButton {
+  min-width: 160px;
+  min-height: 58px;
+  padding: 0 24px;
+  border-radius: $radius-pill;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: 0 16px 34px rgba(147, 73, 55, 0.18);
+}
+
+.backButton:hover:enabled,
+.nextButton:hover:enabled {
+  filter: brightness(1.05);
+}
+
+.backButton:active:enabled,
+.nextButton:active:enabled {
+  transform: scale(0.985);
+}
+
+.backButton:disabled,
+.nextButton:disabled {
+  opacity: 0.5;
+}
+
+@media (min-width: 960px) {
+  .main {
+    padding-top: 40px;
+  }
+
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 0.95fr);
+    align-items: start;
+  }
+
+  .heroCard {
+    min-height: 720px;
+    padding: 40px 38px;
+  }
+
+  .panelCard {
+    min-height: 720px;
+    padding: 36px 32px 0;
+  }
+
+  .splitCard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@include mobile-down {
+  .topBarInner,
+  .main,
+  .footerInner {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .heroCard,
+  .panelCard {
+    border-radius: 24px;
+  }
+
+  .chipGrid,
+  .multiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footerInner {
+    align-items: stretch;
+  }
+
+  .nextButton {
+    min-width: 0;
+    flex: 1;
+  }
+}

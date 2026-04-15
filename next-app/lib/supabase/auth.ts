@@ -1,15 +1,31 @@
 import { getSupabaseBrowserClient } from "./client";
-import type { SignInPayload } from "./types";
+import type { EmailPasswordAuthPayload } from "./types";
 
 export async function signInWithEmailPassword({
   email,
-  password
-}: SignInPayload) {
+  password,
+}: EmailPasswordAuthPayload) {
   const supabase = getSupabaseBrowserClient();
-  console.log(email, password)
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function signUpWithEmailPassword({
+  email,
+  password,
+}: EmailPasswordAuthPayload) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
   });
 
   if (error) {
