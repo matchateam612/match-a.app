@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Database } from './database.types'
 import { getSupabaseBrowserEnv } from "./env";
 
-let browserClient: ReturnType<typeof createClient> | null = null;
+let browserClient: ReturnType<typeof createClient<Database>> | null = null;
 
 export function getSupabaseBrowserClient() {
   if (browserClient) {
