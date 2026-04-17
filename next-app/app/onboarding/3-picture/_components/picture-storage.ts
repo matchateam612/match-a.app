@@ -44,9 +44,9 @@ export function readStoredPictureState(): StoredPictureState {
 }
 
 export function hasPictureDraftContent(draft: PictureDraft) {
-  return Boolean(draft.previewDataUrl || draft.originalDataUrl || draft.source);
+  return Boolean(draft.fileName || draft.source || draft.prompt.trim());
 }
 
 export function isPictureReady(draft: PictureDraft) {
-  return Boolean(draft.source && draft.originalDataUrl && draft.previewDataUrl);
+  return Boolean(draft.source && draft.fileName && draft.mimeType);
 }

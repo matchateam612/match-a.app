@@ -36,18 +36,18 @@ export function PictureLayout({ children, draftStatus, footer, status }: Picture
 
               <div>
                 <h1 className={styles.heroTitle}>
-                  Lead with a <span className={styles.heroHighlight}>softened first glance</span>.
+                  Lead with a <span className={styles.heroHighlight}>strong first photo</span>.
                 </h1>
                 <p className={styles.heroCopy}>
-                  Add a real photo, then we turn it into a polished manga-inspired portrait that
-                  keeps your core traits visible while lowering snap-judgment pressure.
+                  Add a real photo, review a cleaned-up AI version if you want one, and save the
+                  final JPEG to your profile.
                 </p>
               </div>
 
               <div className={styles.heroBadges}>
                 <div className={styles.heroBadge}>Upload or use the front camera</div>
                 <div className={`${styles.heroBadge} ${styles.heroBadgeAccent}`}>
-                  Stylized preview saved with your onboarding
+                  AI transform falls back to your original image
                 </div>
               </div>
             </div>

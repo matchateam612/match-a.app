@@ -7,12 +7,12 @@ export const TOTAL_STEPS = 1;
 
 export const initialDraft: PictureDraft = {
   source: "",
-  originalDataUrl: "",
-  stylizedDataUrl: "",
-  previewDataUrl: "",
+  prompt:
+    "Turn this real profile photo into a clean, flattering dating profile portrait. Keep the same person, facial structure, skin tone, hair color, and overall identity. Improve lighting and polish the image while keeping it believable, warm, and natural.",
   fileName: "",
   mimeType: "",
   width: 0,
   height: 0,
-  stylizedAt: "",
+  transformedAt: "",
+  hasGeneratedImage: false,
 };

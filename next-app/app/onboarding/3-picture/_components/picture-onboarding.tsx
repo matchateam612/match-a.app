@@ -14,16 +14,16 @@ import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboardi
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { upsertUserPrivateInfo } from "@/lib/supabase/user-private-info";
+import { uploadUserPfp } from "@/lib/supabase/user-picture";
 import { initialDraft, PICTURE_STEP_STORAGE_KEY, USER_INFO_STORAGE_KEY } from "./picture-data";
 import { CameraCaptureCard } from "./camera-capture-card";
 import { PictureHero } from "./picture-hero";
 import { PictureLayout } from "./picture-layout";
 import { PicturePreviewCard } from "./picture-preview-card";
 import { PictureSourcePicker } from "./picture-source-picker";
-import { fileToDataUrl, renderStylizedPortrait } from "./picture-image-utils";
+import { usePictureDraftFiles } from "./picture-draft-files";
+import { preparePictureFile, transformPictureWithAi } from "./picture-file-utils";
 import { hasPictureDraftContent, isPictureReady, readStoredPictureState } from "./picture-storage";
-import { StylizingCard } from "./stylizing-card";
 import type { PictureDraft, PictureSource } from "./picture-types";
 
 export function PictureOnboarding() {
@@ -60,7 +60,7 @@ function PictureOnboardingClient() {
   const [captureSource, setCaptureSource] = useState<PictureSource>("");
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [isRenderingPortrait, setIsRenderingPortrait] = useState(false);
+  const [isTransformingImage, setIsTransformingImage] = useState(false);
 
   const buildUserInfo = useCallback(
     ({
@@ -108,10 +108,22 @@ function PictureOnboardingClient() {
     setSaveError,
     setSaveMessage,
   });
+  const {
+    isHydratingFiles,
+    originalFile,
+    generatedFile,
+    originalPreviewUrl,
+    generatedPreviewUrl,
+    setOriginalFile,
+    setGeneratedFile,
+    clearFiles,
+  } = usePictureDraftFiles({
+    enabled: true,
+  });
 
   const canContinue = useMemo(
-    () => isPictureReady(draft) && !isRenderingPortrait,
-    [draft, isRenderingPortrait],
+    () => isPictureReady(draft) && Boolean(originalFile) && !isTransformingImage && !isHydratingFiles,
+    [draft, isHydratingFiles, isTransformingImage, originalFile],
   );
 
   const stopCamera = useCallback(() => {
@@ -131,38 +143,45 @@ function PictureOnboardingClient() {
 
   useEffect(() => stopCamera, [stopCamera]);
 
-  const applyPortrait = useCallback(
-    async (dataUrl: string, source: PictureSource, fileName: string, mimeType: string) => {
+  useEffect(() => {
+    if (isHydratingFiles) {
+      return;
+    }
+
+    if (draft.fileName && !originalFile) {
+      setSaveError("Your saved picture metadata was found, but the local photo draft is unavailable.");
+    }
+  }, [draft.fileName, isHydratingFiles, originalFile, setSaveError]);
+
+  const applyPicture = useCallback(
+    async (file: File, source: PictureSource) => {
       clearSaveFeedback();
       setCameraError("");
-      setIsRenderingPortrait(true);
 
       try {
-        const portrait = await renderStylizedPortrait(dataUrl);
+        const prepared = await preparePictureFile(file);
 
+        await setOriginalFile(prepared.file);
         setDraft({
           source,
-          originalDataUrl: portrait.originalDataUrl,
-          stylizedDataUrl: portrait.stylizedDataUrl,
-          previewDataUrl: portrait.previewDataUrl,
-          fileName,
-          mimeType,
-          width: portrait.width,
-          height: portrait.height,
-          stylizedAt: new Date().toISOString(),
+          prompt: draft.prompt,
+          fileName: prepared.file.name,
+          mimeType: prepared.file.type,
+          width: prepared.width,
+          height: prepared.height,
+          transformedAt: "",
+          hasGeneratedImage: false,
         });
         setCurrentStep(0);
       } catch (error) {
         setSaveError(
           error instanceof Error && error.message
             ? error.message
-            : "We couldn't stylize that photo right now.",
+            : "We couldn't prepare that photo right now.",
         );
-      } finally {
-        setIsRenderingPortrait(false);
       }
     },
-    [clearSaveFeedback, setCurrentStep, setDraft, setSaveError],
+    [clearSaveFeedback, draft.prompt, setCurrentStep, setDraft, setOriginalFile, setSaveError],
   );
 
   const onFileChange = useCallback(
@@ -180,8 +199,7 @@ function PictureOnboardingClient() {
 
       try {
         setCaptureSource("upload");
-        const dataUrl = await fileToDataUrl(file);
-        await applyPortrait(dataUrl, "upload", file.name, file.type);
+        await applyPicture(file, "upload");
       } catch (error) {
         setSaveError(
           error instanceof Error && error.message
@@ -192,7 +210,7 @@ function PictureOnboardingClient() {
         event.target.value = "";
       }
     },
-    [applyPortrait, setSaveError],
+    [applyPicture, setSaveError],
   );
 
   const openCamera = useCallback(async () => {
@@ -252,22 +270,69 @@ function PictureOnboardingClient() {
 
     captureContext.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
     stopCamera();
-    await applyPortrait(
-      captureCanvas.toDataURL("image/jpeg", 0.92),
-      "camera",
-      `camera-capture-${Date.now()}.jpg`,
-      "image/jpeg",
+    const blob = await new Promise<Blob | null>((resolve) =>
+      captureCanvas.toBlob(resolve, "image/jpeg", 0.92),
     );
-  }, [applyPortrait, stopCamera]);
+
+    if (!blob) {
+      setCameraError("We couldn't capture your camera frame.");
+      return;
+    }
+
+    await applyPicture(
+      new File([blob], `camera-capture-${Date.now()}.jpg`, { type: "image/jpeg" }),
+      "camera",
+    );
+  }, [applyPicture, stopCamera]);
+
+  const runAiTransform = useCallback(async () => {
+    if (!originalFile || isTransformingImage || isSavingSection) {
+      return;
+    }
+
+    clearSaveFeedback();
+    setCameraError("");
+    setIsTransformingImage(true);
+
+    try {
+      const transformed = await transformPictureWithAi(originalFile, draft.prompt);
+      await setGeneratedFile(transformed);
+      setDraft((current) => ({
+        ...current,
+        transformedAt: new Date().toISOString(),
+        hasGeneratedImage: true,
+      }));
+      setSaveMessage("AI image ready. You can finish with this version.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error && error.message
+          ? error.message
+          : "We couldn't generate the AI image right now.",
+      );
+    } finally {
+      setIsTransformingImage(false);
+    }
+  }, [
+    clearSaveFeedback,
+    draft.prompt,
+    isSavingSection,
+    isTransformingImage,
+    originalFile,
+    setDraft,
+    setGeneratedFile,
+    setSaveError,
+    setSaveMessage,
+  ]);
 
   const resetPhoto = useCallback(() => {
     clearSaveFeedback();
     setCameraError("");
     stopCamera();
     setCaptureSource("");
+    void clearFiles();
     setDraft(initialDraft);
     setCurrentStep(0);
-  }, [clearSaveFeedback, setCurrentStep, setDraft, stopCamera]);
+  }, [clearFiles, clearSaveFeedback, setCurrentStep, setDraft, stopCamera]);
 
   const finishPicture = useCallback(async () => {
     if (!canContinue || isSavingSection) {
@@ -285,9 +350,15 @@ function PictureOnboardingClient() {
         throw new Error("Please sign in before finishing this section.");
       }
 
-      await upsertUserPrivateInfo(user.id, userInfo);
+      const fileToUpload = generatedFile ?? originalFile;
+
+      if (!fileToUpload) {
+        throw new Error("Please add a photo before finishing this section.");
+      }
+
+      await uploadUserPfp(user.id, fileToUpload);
       writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
-      setSaveMessage("Picture saved. Your stylized profile image is ready.");
+      setSaveMessage("Picture saved. Your profile image is ready.");
       router.push("/onboarding");
     } catch (error) {
       setSaveError(
@@ -306,13 +377,15 @@ function PictureOnboardingClient() {
     setSaveError,
     setSaveMessage,
     userInfo,
+    generatedFile,
+    originalFile,
   ]);
 
-  const interactionDisabled = isRenderingPortrait || isSavingSection;
+  const interactionDisabled = isTransformingImage || isSavingSection || isHydratingFiles;
 
   return (
-    <PictureLayout
-      draftStatus={draftStatus}
+      <PictureLayout
+      draftStatus={isHydratingFiles ? "Restoring your saved photo draft..." : draftStatus}
       status={
         <OnboardingSectionStatus
           errorMessage={cameraError || saveError}
@@ -373,9 +446,51 @@ function PictureOnboardingClient() {
           />
         ) : null}
 
-        {isRenderingPortrait ? <StylizingCard /> : null}
+        <div className={styles.stackCard}>
+          <span className={styles.inlineLabel}>AI prompt</span>
+          <textarea
+            className={styles.input}
+            value={draft.prompt}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                prompt: event.target.value,
+              }))
+            }
+            rows={5}
+            disabled={interactionDisabled}
+            placeholder="Describe how the AI should polish this profile photo."
+            style={{
+              minHeight: "140px",
+              paddingTop: "18px",
+              paddingBottom: "18px",
+              resize: "vertical",
+            }}
+          />
+          <p className={styles.helper}>
+            This prompt is sent with your current image to the AI image converter. If no API key
+            is configured, the original JPEG is kept.
+          </p>
+          <button
+            className={styles.nextButton}
+            type="button"
+            onClick={runAiTransform}
+            disabled={
+              !originalFile || isTransformingImage || isSavingSection || isHydratingFiles || !draft.prompt.trim()
+            }
+          >
+            {isTransformingImage ? "Generating..." : "Generate AI version"}
+          </button>
+        </div>
 
-        {draft.previewDataUrl ? <PicturePreviewCard draft={draft} onReset={resetPhoto} /> : null}
+        {originalPreviewUrl ? (
+          <PicturePreviewCard
+            draft={draft}
+            originalPreviewUrl={originalPreviewUrl}
+            generatedPreviewUrl={generatedPreviewUrl}
+            onReset={resetPhoto}
+          />
+        ) : null}
       </div>
     </PictureLayout>
   );

@@ -26,7 +26,7 @@ export function PictureSourcePicker({
       >
         <span className={styles.chipTitle}>Upload a photo</span>
         <span className={styles.chipCopy}>
-          Pick an image from this device and we will stylize it for your profile.
+          Pick an image from this device and we will convert it to a profile-ready JPEG.
         </span>
       </button>
 
@@ -38,7 +38,7 @@ export function PictureSourcePicker({
       >
         <span className={styles.chipTitle}>Use front camera</span>
         <span className={styles.chipCopy}>
-          Open the selfie camera, capture one frame, and turn it into your onboarding portrait.
+          Open the selfie camera, capture one frame, and use it as your onboarding photo.
         </span>
       </button>
     </div>
