@@ -6,7 +6,7 @@ import styles from "../../1-basics/page.module.scss";
 
 type TextInputBarProps = {
   disabled?: boolean;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string) => void | Promise<void>;
 };
 
 export function TextInputBar({ disabled = false, onSubmit }: TextInputBarProps) {

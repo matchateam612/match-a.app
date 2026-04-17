@@ -10,6 +10,7 @@ type ChatPanelProps = {
   selectedMode: AgentConversationMode | null;
   transcript: AgentTranscriptItem[];
   voiceStatusMessage: string;
+  isSubmittingTurn?: boolean;
   onSubmitTextTurn: (value: string) => void;
 };
 
@@ -17,6 +18,7 @@ export function ChatPanel({
   selectedMode,
   transcript,
   voiceStatusMessage,
+  isSubmittingTurn = false,
   onSubmitTextTurn,
 }: ChatPanelProps) {
   return (
@@ -25,7 +27,9 @@ export function ChatPanel({
         <VoiceSessionPanel statusMessage={voiceStatusMessage} />
       ) : null}
 
-      {selectedMode === "text" ? <TextInputBar onSubmit={onSubmitTextTurn} /> : null}
+      {selectedMode === "text" ? (
+        <TextInputBar disabled={isSubmittingTurn} onSubmit={onSubmitTextTurn} />
+      ) : null}
 
       {!selectedMode ? (
         <div className={styles.stackCard}>

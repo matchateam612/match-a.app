@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import styles from "../../1-basics/page.module.scss";
@@ -8,9 +8,10 @@ import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
 import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
-import { createCriterionStates, defaultAgentCriteria } from "../_lib/agent-criteria";
+import type { SubmitAgentTurnResponse } from "../_lib/agent-api-types";
+import { defaultAgentCriteria } from "../_lib/agent-criteria";
 import { buildDraftSummary, buildStarterAssistantMessage, createTranscriptItem } from "../_lib/agent-orchestrator";
-import { readAgentPromptSettings, readStoredAgentState, hasAgentDraftContent, persistAgentState } from "../_lib/agent-storage";
+import { hasAgentDraftContent, persistAgentState, readAgentPromptSettings, readStoredAgentState, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
 import { getVoiceScaffoldStatus } from "../_lib/agent-voice";
 import type { AgentOnboardingState, AgentConversationMode } from "../_lib/agent-types";
 import { AgentLayout } from "./agent-layout";
@@ -18,6 +19,17 @@ import { AgentSummaryCard } from "./agent-summary-card";
 import { ChatPanel } from "./chat-panel";
 import { CompletionReview } from "./completion-review";
 import { ModePicker } from "./mode-picker";
+
+function isSubmitAgentTurnResponse(
+  payload: SubmitAgentTurnResponse | { error?: string },
+): payload is SubmitAgentTurnResponse {
+  return (
+    "criteria" in payload &&
+    "assistantMessage" in payload &&
+    "draftSummary" in payload &&
+    "status" in payload
+  );
+}
 
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
@@ -39,7 +51,9 @@ export function AgentOnboarding() {
 
 function AgentOnboardingClient() {
   const router = useRouter();
+  const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const promptSettings = readAgentPromptSettings();
+  const criteriaDefinitions = readTestingCriteriaDefinitions();
 
   const buildUserInfo = useCallback(
     ({
@@ -117,54 +131,93 @@ function AgentOnboardingClient() {
   );
 
   const onSubmitTextTurn = useCallback(
-    (value: string) => {
+    async (value: string) => {
+      if (isSubmittingTurn || !draft.selectedMode) {
+        return;
+      }
+
       setSaveError("");
+      setSaveMessage("");
+      setIsSubmittingTurn(true);
 
-      setDraft((current) => {
-        const nextCriteria =
-          current.criteria.length > 0
-            ? current.criteria.map((criterion, index) =>
-                index === 0 && criterion.status === "missing"
-                  ? {
-                      ...criterion,
-                      summary: "Placeholder extraction from testing turn. Replace with model output later.",
-                      confidence: 0.72,
-                      status: "tentative" as const,
-                      source: "explicit" as const,
-                      evidence: [value],
-                      updatedAt: new Date().toISOString(),
-                      needsConfirmation: true,
-                    }
-                  : criterion,
-              )
-            : createCriterionStates(defaultAgentCriteria);
-
-        const nextTranscript = [
-          ...current.transcript,
-          createTranscriptItem({
-            role: "user",
-            modality: "text",
-            text: value,
-          }),
-          createTranscriptItem({
-            role: "assistant",
-            modality: "text",
-            text: "Scaffold reply: in the real flow, the interviewer model will respond using the system prompt, recent transcript, and current criteria state.",
-          }),
-        ];
-
-        return {
-          ...current,
-          turnCount: current.turnCount + 1,
-          criteria: nextCriteria,
-          transcript: nextTranscript,
-          lastAskedCriterionId: nextCriteria.find((criterion) => criterion.status === "missing")?.id ?? null,
-        };
+      const userTranscriptItem = createTranscriptItem({
+        role: "user",
+        modality: "text",
+        text: value,
       });
 
-      setSaveMessage("Testing turn added. This scaffold now updates transcript and placeholder criterion state.");
+      const requestTranscript = [...draft.transcript, userTranscriptItem];
+
+      setDraft((current) => ({
+        ...current,
+        turnCount: current.turnCount + 1,
+        transcript: requestTranscript,
+      }));
+
+      try {
+        const response = await fetch("/api/agent-turn", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            selectedMode: draft.selectedMode,
+            userMessage: value,
+            transcript: requestTranscript,
+            criteriaDefinitions,
+            criteria: draft.criteria,
+            interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
+          }),
+        });
+
+        const payload = (await response.json()) as SubmitAgentTurnResponse | { error?: string };
+
+        if (!response.ok || !isSubmitAgentTurnResponse(payload)) {
+          throw new Error(
+            "error" in payload && payload.error
+              ? payload.error
+              : "The agent turn request failed.",
+          );
+        }
+
+        setDraft((current) => ({
+          ...current,
+          criteria: payload.criteria,
+          transcript: [
+            ...requestTranscript,
+            createTranscriptItem({
+              role: "assistant",
+              modality: "text",
+              text: payload.assistantMessage,
+            }),
+          ],
+          status: payload.status,
+          finalSummary: payload.status !== "collecting" ? payload.draftSummary : current.finalSummary,
+          lastAskedCriterionId: payload.lastAskedCriterionId,
+        }));
+
+        setProgress(payload.status);
+        setSaveMessage("Agent turn processed. Extracted criteria and next reply are now coming from the API route.");
+      } catch (error) {
+        setSaveError(
+          error instanceof Error ? error.message : "The agent turn could not be processed.",
+        );
+      } finally {
+        setIsSubmittingTurn(false);
+      }
     },
-    [setDraft, setSaveError, setSaveMessage],
+    [
+      criteriaDefinitions,
+      draft.criteria,
+      draft.selectedMode,
+      draft.transcript,
+      isSubmittingTurn,
+      promptSettings.interviewerSystemPrompt,
+      setDraft,
+      setProgress,
+      setSaveError,
+      setSaveMessage,
+    ],
   );
 
   const draftSummary = buildDraftSummary(draft.criteria);
@@ -226,6 +279,7 @@ function AgentOnboardingClient() {
         transcript={draft.transcript}
         voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
         onSubmitTextTurn={onSubmitTextTurn}
+        isSubmittingTurn={isSubmittingTurn}
       />
 
       <AgentSummaryCard criteria={draft.criteria} finalSummary={draft.finalSummary} />
