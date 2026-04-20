@@ -1,6 +1,36 @@
+"use client";
+
+import Image from "next/image";
+import { useEffect, useState } from "react";
+
+import { getProfilePictureRequest } from "@/lib/pictures/picture-api";
 import styles from "../page.module.scss";
 
 export function DashboardTopBar() {
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void (async () => {
+      try {
+        const profilePicture = await getProfilePictureRequest();
+
+        if (!isCancelled) {
+          setProfilePictureUrl(profilePicture.signedUrl);
+        }
+      } catch {
+        if (!isCancelled) {
+          setProfilePictureUrl(null);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   return (
     <header className={styles.topBar}>
       <div className={styles.topBarInner}>
@@ -19,7 +49,20 @@ export function DashboardTopBar() {
           >
             ◌
           </button>
-          <div aria-hidden="true" className={styles.avatar} />
+          <div className={styles.avatar}>
+            {profilePictureUrl ? (
+              <Image
+                src={profilePictureUrl}
+                alt="Your profile picture"
+                fill
+                unoptimized
+                sizes="40px"
+                style={{ objectFit: "cover" }}
+              />
+            ) : (
+              <div aria-hidden="true" className={styles.avatarFallback} />
+            )}
+          </div>
         </div>
       </div>
     </header>

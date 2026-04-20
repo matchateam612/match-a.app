@@ -7,6 +7,7 @@ import type { GalleryPictureSlot } from "./picture-types";
 type PictureGalleryCardProps = {
   slots: GalleryPictureSlot[];
   disabled: boolean;
+  isLoading: boolean;
   onUploadClick: (slot: number) => void;
   onDeleteClick: (slot: number) => void;
 };
@@ -14,6 +15,7 @@ type PictureGalleryCardProps = {
 export function PictureGalleryCard({
   slots,
   disabled,
+  isLoading,
   onUploadClick,
   onDeleteClick,
 }: PictureGalleryCardProps) {
@@ -24,6 +26,7 @@ export function PictureGalleryCard({
         Add up to {MAX_GALLERY_PHOTOS} extra private photos. Empty slots stay empty until you use
         them.
       </p>
+      {isLoading ? <p className={styles.helper}>Loading your saved extra photos...</p> : null}
       <div
         style={{
           display: "grid",
@@ -98,7 +101,7 @@ export function PictureGalleryCard({
                 className={styles.nextButton}
                 type="button"
                 onClick={() => onUploadClick(slot.slot)}
-                disabled={disabled || slot.isUploading || slot.isDeleting}
+                disabled={disabled || isLoading || slot.isUploading || slot.isDeleting}
               >
                 {slot.isUploading ? "Uploading..." : slot.path ? "Replace photo" : "Upload photo"}
               </button>
@@ -106,7 +109,7 @@ export function PictureGalleryCard({
                 className={styles.backButton}
                 type="button"
                 onClick={() => onDeleteClick(slot.slot)}
-                disabled={disabled || slot.isUploading || slot.isDeleting || !slot.path}
+                disabled={disabled || isLoading || slot.isUploading || slot.isDeleting || !slot.path}
               >
                 {slot.isDeleting ? "Removing..." : "Remove photo"}
               </button>

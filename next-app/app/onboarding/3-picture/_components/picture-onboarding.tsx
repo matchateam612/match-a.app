@@ -15,11 +15,11 @@ import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-sav
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import {
-  deleteUserGalleryPhoto,
-  listUserGalleryPhotos,
-  uploadUserGalleryPhoto,
-  uploadUserPfp,
-} from "@/lib/supabase/user-picture";
+  deleteGalleryPictureRequest,
+  listGalleryPicturesRequest,
+  uploadGalleryPictureRequest,
+  uploadProfilePictureRequest,
+} from "@/lib/pictures/picture-api";
 import {
   initialDraft,
   MAX_GALLERY_PHOTOS,
@@ -176,13 +176,11 @@ function PictureOnboardingClient() {
 
     void (async () => {
       try {
-        const user = await getCurrentUser();
-
-        if (!user || isCancelled) {
+        if (isCancelled) {
           return;
         }
 
-        const photos = await listUserGalleryPhotos(user.id);
+        const { photos } = await listGalleryPicturesRequest();
 
         if (isCancelled) {
           return;
@@ -334,12 +332,6 @@ function PictureOnboardingClient() {
       }
 
       try {
-        const user = await getCurrentUser();
-
-        if (!user) {
-          throw new Error("Please sign in before uploading extra photos.");
-        }
-
         clearSaveFeedback();
         setGallerySlots((current) =>
           current.map((entry) =>
@@ -348,15 +340,15 @@ function PictureOnboardingClient() {
         );
 
         const prepared = await preparePictureFile(file);
-        const signedUrl = await uploadUserGalleryPhoto(user.id, slot, prepared.file);
+        const uploadedPhoto = await uploadGalleryPictureRequest(slot, prepared.file);
 
         setGallerySlots((current) =>
           current.map((entry) =>
             entry.slot === slot
               ? {
                   ...entry,
-                  path: `${user.id}/gallery/picture_${String(slot).padStart(3, "0")}.jpg`,
-                  previewUrl: signedUrl,
+                  path: uploadedPhoto.path,
+                  previewUrl: uploadedPhoto.signedUrl,
                   isUploading: false,
                 }
               : entry,
@@ -504,12 +496,6 @@ function PictureOnboardingClient() {
   const removeGalleryPhoto = useCallback(
     async (slot: number) => {
       try {
-        const user = await getCurrentUser();
-
-        if (!user) {
-          throw new Error("Please sign in before removing extra photos.");
-        }
-
         clearSaveFeedback();
         setGallerySlots((current) =>
           current.map((entry) =>
@@ -517,7 +503,7 @@ function PictureOnboardingClient() {
           ),
         );
 
-        await deleteUserGalleryPhoto(user.id, slot);
+        await deleteGalleryPictureRequest(slot);
 
         setGallerySlots((current) =>
           current.map((entry) =>
@@ -570,7 +556,7 @@ function PictureOnboardingClient() {
         throw new Error("Please add a photo before finishing this section.");
       }
 
-      await uploadUserPfp(user.id, fileToUpload);
+      await uploadProfilePictureRequest(fileToUpload);
       writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
       setSaveMessage("Picture saved. Your profile image is ready.");
       router.push("/onboarding");
@@ -595,8 +581,7 @@ function PictureOnboardingClient() {
     originalFile,
   ]);
 
-  const interactionDisabled =
-    isTransformingImage || isSavingSection || isHydratingFiles || isLoadingGallery;
+  const interactionDisabled = isTransformingImage || isSavingSection || isHydratingFiles;
 
   return (
       <PictureLayout
@@ -716,7 +701,8 @@ function PictureOnboardingClient() {
         {originalPreviewUrl ? (
           <PictureGalleryCard
             slots={gallerySlots}
-            disabled={interactionDisabled}
+            disabled={isTransformingImage || isSavingSection}
+            isLoading={isLoadingGallery}
             onUploadClick={openGalleryUpload}
             onDeleteClick={removeGalleryPhoto}
           />
