@@ -11,6 +11,11 @@ function jsonError(message: string, status = 400) {
 export async function POST() {
   try {
     const env = assertOpenAiRealtimeEnv();
+    console.log("[agent-voice][session] Creating realtime client secret.", {
+      model: env.model,
+      voice: env.voice,
+      hasApiKey: Boolean(env.apiKey),
+    });
 
     const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
       method: "POST",
@@ -51,12 +56,17 @@ export async function POST() {
         errorText,
       });
       return jsonError(
-        `OpenAI Realtime session request failed with ${response.status}.`,
+        `OpenAI Realtime session request failed with ${response.status}: ${errorText || "Unknown upstream error."}`,
         500,
       );
     }
 
     const data = await response.json();
+    console.log("[agent-voice][session] Realtime client secret created.", {
+      id: typeof data?.id === "string" ? data.id : null,
+      hasClientSecret: Boolean(data?.client_secret?.value),
+      rawKeys: data && typeof data === "object" ? Object.keys(data) : [],
+    });
     return NextResponse.json(data, { status: 200 });
   } catch (error) {
     console.error("[agent-voice][session] Failed to create realtime session.", {

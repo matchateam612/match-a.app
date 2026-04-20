@@ -46,7 +46,19 @@ function isSubmitAgentTurnResponse(
 function isCreateRealtimeSessionResponse(
   payload: CreateRealtimeSessionResponse | { error?: string },
 ): payload is CreateRealtimeSessionResponse {
-  return "client_secret" in payload;
+  return "client_secret" in payload || "value" in payload;
+}
+
+function getRealtimeEphemeralKey(payload: CreateRealtimeSessionResponse) {
+  if (typeof payload.value === "string" && payload.value.trim()) {
+    return payload.value;
+  }
+
+  if (typeof payload.client_secret?.value === "string" && payload.client_secret.value.trim()) {
+    return payload.client_secret.value;
+  }
+
+  return "";
 }
 
 function createVoiceTranscriptItem(text: string, role: "assistant" | "user"): AgentTranscriptItem {
@@ -218,6 +230,7 @@ export function useAgentVoiceSession({
     try {
       setConnectionStatus("requesting-permission");
       setLiveTranscript("");
+      console.log("[agent-voice] Starting voice connection flow.");
 
       const tokenResponse = await fetch("/api/agent-voice/session", {
         method: "POST",
@@ -225,8 +238,17 @@ export function useAgentVoiceSession({
       const tokenPayload = (await tokenResponse.json()) as
         | CreateRealtimeSessionResponse
         | { error?: string };
+      const ephemeralKey = isCreateRealtimeSessionResponse(tokenPayload)
+        ? getRealtimeEphemeralKey(tokenPayload)
+        : "";
+      console.log("[agent-voice] Realtime session response received.", {
+        ok: tokenResponse.ok,
+        status: tokenResponse.status,
+        payload: tokenPayload,
+        hasEphemeralKey: Boolean(ephemeralKey),
+      });
 
-      if (!tokenResponse.ok || !isCreateRealtimeSessionResponse(tokenPayload) || !tokenPayload.client_secret?.value) {
+      if (!tokenResponse.ok || !isCreateRealtimeSessionResponse(tokenPayload) || !ephemeralKey) {
         throw new Error(
           "error" in tokenPayload && tokenPayload.error
             ? tokenPayload.error
@@ -238,6 +260,9 @@ export function useAgentVoiceSession({
         audio: true,
       });
       mediaStreamRef.current = mediaStream;
+      console.log("[agent-voice] Microphone access granted.", {
+        trackCount: mediaStream.getAudioTracks().length,
+      });
 
       setConnectionStatus("connecting");
 
@@ -261,12 +286,14 @@ export function useAgentVoiceSession({
 
       dataChannel.addEventListener("open", () => {
         setConnectionStatus("connected");
+        console.log("[agent-voice] Realtime data channel opened.");
         onInfo("Voice connection ready. Speak naturally and the same agent logic will process each completed turn.");
       });
 
       dataChannel.addEventListener("message", async (event) => {
         try {
           const serverEvent = JSON.parse(event.data) as RealtimeServerEvent;
+          console.log("[agent-voice] Realtime event received.", serverEvent);
 
           if (serverEvent.type === "conversation.item.input_audio_transcription.completed") {
             setLiveTranscript("");
@@ -294,26 +321,40 @@ export function useAgentVoiceSession({
 
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
+      console.log("[agent-voice] Created local WebRTC offer.", {
+        sdpLength: offer.sdp?.length ?? 0,
+      });
 
       const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
         method: "POST",
         body: offer.sdp,
         headers: {
-          Authorization: `Bearer ${tokenPayload.client_secret.value}`,
+          Authorization: `Bearer ${ephemeralKey}`,
           "Content-Type": "application/sdp",
         },
       });
 
       if (!sdpResponse.ok) {
-        throw new Error(`Realtime SDP exchange failed with status ${sdpResponse.status}.`);
+        const errorText = await sdpResponse.text();
+        console.error("[agent-voice] Realtime SDP exchange failed.", {
+          status: sdpResponse.status,
+          errorText,
+        });
+        throw new Error(
+          `Realtime SDP exchange failed with status ${sdpResponse.status}: ${errorText || "Unknown upstream error."}`,
+        );
       }
 
       const answerSdp = await sdpResponse.text();
+      console.log("[agent-voice] Received remote WebRTC answer.", {
+        sdpLength: answerSdp.length,
+      });
 
       await peerConnection.setRemoteDescription({
         type: "answer",
         sdp: answerSdp,
       });
+      console.log("[agent-voice] Remote description set successfully.");
     } catch (error) {
       console.error("[agent-voice] Failed to connect voice session.", error);
       disconnect();

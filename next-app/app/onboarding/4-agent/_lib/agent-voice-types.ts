@@ -1,6 +1,7 @@
 import type { AgentCriterionDefinition, AgentCriterionState, AgentTranscriptItem } from "./agent-types";
 
 export type CreateRealtimeSessionResponse = {
+  value?: string;
   client_secret?: {
     value?: string;
   };
