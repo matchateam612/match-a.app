@@ -14,9 +14,20 @@ import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboardi
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { uploadUserPfp } from "@/lib/supabase/user-picture";
-import { initialDraft, PICTURE_STEP_STORAGE_KEY, USER_INFO_STORAGE_KEY } from "./picture-data";
+import {
+  deleteUserGalleryPhoto,
+  listUserGalleryPhotos,
+  uploadUserGalleryPhoto,
+  uploadUserPfp,
+} from "@/lib/supabase/user-picture";
+import {
+  initialDraft,
+  MAX_GALLERY_PHOTOS,
+  PICTURE_STEP_STORAGE_KEY,
+  USER_INFO_STORAGE_KEY,
+} from "./picture-data";
 import { CameraCaptureCard } from "./camera-capture-card";
+import { PictureGalleryCard } from "./picture-gallery-card";
 import { PictureHero } from "./picture-hero";
 import { PictureLayout } from "./picture-layout";
 import { PicturePreviewCard } from "./picture-preview-card";
@@ -24,7 +35,17 @@ import { PictureSourcePicker } from "./picture-source-picker";
 import { usePictureDraftFiles } from "./picture-draft-files";
 import { preparePictureFile, transformPictureWithAi } from "./picture-file-utils";
 import { hasPictureDraftContent, isPictureReady, readStoredPictureState } from "./picture-storage";
-import type { PictureDraft, PictureSource } from "./picture-types";
+import type { GalleryPictureSlot, PictureDraft, PictureSource } from "./picture-types";
+
+function createEmptyGallerySlots(): GalleryPictureSlot[] {
+  return Array.from({ length: MAX_GALLERY_PHOTOS }, (_, index) => ({
+    slot: index + 1,
+    path: null,
+    previewUrl: null,
+    isUploading: false,
+    isDeleting: false,
+  }));
+}
 
 export function PictureOnboarding() {
   const isClientReady = useClientReady();
@@ -55,13 +76,17 @@ export function PictureOnboarding() {
 function PictureOnboardingClient() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const galleryUploadSlotRef = useRef<number | null>(null);
   const [captureSource, setCaptureSource] = useState<PictureSource>("");
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [isTransformingImage, setIsTransformingImage] = useState(false);
+  const [gallerySlots, setGallerySlots] = useState<GalleryPictureSlot[]>(() => createEmptyGallerySlots());
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true);
 
   const buildUserInfo = useCallback(
     ({
@@ -145,6 +170,58 @@ function PictureOnboardingClient() {
   }, []);
 
   useEffect(() => stopCamera, [stopCamera]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void (async () => {
+      try {
+        const user = await getCurrentUser();
+
+        if (!user || isCancelled) {
+          return;
+        }
+
+        const photos = await listUserGalleryPhotos(user.id);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setGallerySlots((current) =>
+          current.map((slot) => {
+            const photo = photos.find((entry) => entry.slot === slot.slot);
+
+            if (!photo) {
+              return {
+                ...slot,
+                path: null,
+                previewUrl: null,
+              };
+            }
+
+            return {
+              ...slot,
+              path: photo.path,
+              previewUrl: photo.signedUrl,
+            };
+          }),
+        );
+      } catch {
+        if (!isCancelled) {
+          setSaveError("We couldn't load your extra photo gallery right now.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingGallery(false);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [setSaveError]);
 
   useEffect(() => {
     if (!isCameraOpen || !streamRef.current || !videoRef.current) {
@@ -237,6 +314,69 @@ function PictureOnboardingClient() {
       }
     },
     [applyPicture, setSaveError],
+  );
+
+  const onGalleryFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const slot = galleryUploadSlotRef.current;
+      const file = event.target.files?.[0];
+
+      event.target.value = "";
+      galleryUploadSlotRef.current = null;
+
+      if (!slot || !file) {
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setSaveError("Please choose an image file for this gallery slot.");
+        return;
+      }
+
+      try {
+        const user = await getCurrentUser();
+
+        if (!user) {
+          throw new Error("Please sign in before uploading extra photos.");
+        }
+
+        clearSaveFeedback();
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot ? { ...entry, isUploading: true } : entry,
+          ),
+        );
+
+        const prepared = await preparePictureFile(file);
+        const signedUrl = await uploadUserGalleryPhoto(user.id, slot, prepared.file);
+
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot
+              ? {
+                  ...entry,
+                  path: `${user.id}/gallery/picture_${String(slot).padStart(3, "0")}.jpg`,
+                  previewUrl: signedUrl,
+                  isUploading: false,
+                }
+              : entry,
+          ),
+        );
+        setSaveMessage(`Photo ${slot} saved to your private gallery.`);
+      } catch (error) {
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot ? { ...entry, isUploading: false } : entry,
+          ),
+        );
+        setSaveError(
+          error instanceof Error && error.message
+            ? error.message
+            : "We couldn't upload that gallery photo right now.",
+        );
+      }
+    },
+    [clearSaveFeedback, setSaveError, setSaveMessage],
   );
 
   const openCamera = useCallback(async () => {
@@ -356,6 +496,58 @@ function PictureOnboardingClient() {
     setCurrentStep(0);
   }, [clearFiles, clearSaveFeedback, setCurrentStep, setDraft, stopCamera]);
 
+  const openGalleryUpload = useCallback((slot: number) => {
+    galleryUploadSlotRef.current = slot;
+    galleryInputRef.current?.click();
+  }, []);
+
+  const removeGalleryPhoto = useCallback(
+    async (slot: number) => {
+      try {
+        const user = await getCurrentUser();
+
+        if (!user) {
+          throw new Error("Please sign in before removing extra photos.");
+        }
+
+        clearSaveFeedback();
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot ? { ...entry, isDeleting: true } : entry,
+          ),
+        );
+
+        await deleteUserGalleryPhoto(user.id, slot);
+
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot
+              ? {
+                  ...entry,
+                  path: null,
+                  previewUrl: null,
+                  isDeleting: false,
+                }
+              : entry,
+          ),
+        );
+        setSaveMessage(`Photo ${slot} was removed from your private gallery.`);
+      } catch (error) {
+        setGallerySlots((current) =>
+          current.map((entry) =>
+            entry.slot === slot ? { ...entry, isDeleting: false } : entry,
+          ),
+        );
+        setSaveError(
+          error instanceof Error && error.message
+            ? error.message
+            : "We couldn't remove that gallery photo right now.",
+        );
+      }
+    },
+    [clearSaveFeedback, setSaveError, setSaveMessage],
+  );
+
   const finishPicture = useCallback(async () => {
     if (!canContinue || isSavingSection) {
       return;
@@ -403,7 +595,8 @@ function PictureOnboardingClient() {
     originalFile,
   ]);
 
-  const interactionDisabled = isTransformingImage || isSavingSection || isHydratingFiles;
+  const interactionDisabled =
+    isTransformingImage || isSavingSection || isHydratingFiles || isLoadingGallery;
 
   return (
       <PictureLayout
@@ -458,6 +651,13 @@ function PictureOnboardingClient() {
           onChange={onFileChange}
           hidden
         />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onGalleryFileChange}
+          hidden
+        />
 
         {isCameraOpen ? (
           <CameraCaptureCard
@@ -510,6 +710,15 @@ function PictureOnboardingClient() {
             originalPreviewUrl={originalPreviewUrl}
             generatedPreviewUrl={generatedPreviewUrl}
             onReset={resetPhoto}
+          />
+        ) : null}
+
+        {originalPreviewUrl ? (
+          <PictureGalleryCard
+            slots={gallerySlots}
+            disabled={interactionDisabled}
+            onUploadClick={openGalleryUpload}
+            onDeleteClick={removeGalleryPhoto}
           />
         ) : null}
       </div>

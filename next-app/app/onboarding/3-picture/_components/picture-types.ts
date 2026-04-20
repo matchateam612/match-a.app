@@ -10,3 +10,11 @@ export type PictureDraft = {
   transformedAt: string;
   hasGeneratedImage: boolean;
 };
+
+export type GalleryPictureSlot = {
+  slot: number;
+  path: string | null;
+  previewUrl: string | null;
+  isUploading: boolean;
+  isDeleting: boolean;
+};
