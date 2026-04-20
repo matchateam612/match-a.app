@@ -22,6 +22,41 @@ export const defaultAgentCriteria: AgentCriterionDefinition[] = [
     required: true,
     placeholderSummary: "Still learning what they want in a partner.",
   },
+  {
+    "id": "emotional_availability",
+    "label": "Emotional availability",
+    "description": "How much emotional bandwidth and openness the user currently has for a relationship.",
+    "required": true,
+    "placeholderSummary": "Still learning how emotionally available they are right now."
+  },
+  {
+    "id": "conflict_recovery",
+    "label": "Conflict recovery",
+    "description": "How the user prefers to repair and reconnect after a disagreement.",
+    "required": true,
+    "placeholderSummary": "Still learning how they bounce back from conflict."
+  },
+  {
+    "id": "quality_time_expression",
+    "label": "Quality time expression",
+    "description": "How the user most meaningfully experiences and gives quality time.",
+    "required": true,
+    "placeholderSummary": "Still learning how quality time feels best to them."
+  },
+  {
+    "id": "independence_balance",
+    "label": "Independence balance",
+    "description": "How much autonomy versus togetherness the user needs in a relationship.",
+    "required": true,
+    "placeholderSummary": "Still learning their ideal balance of space and closeness."
+  },
+  {
+    "id": "commitment_pacing",
+    "label": "Commitment pacing",
+    "description": "The speed at which the user prefers relationships to evolve and deepen.",
+    "required": true,
+    "placeholderSummary": "Still learning how fast or slow they want to move."
+  }
 ];
 
 export function createCriterionState(
