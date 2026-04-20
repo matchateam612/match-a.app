@@ -59,6 +59,7 @@ function PictureOnboardingClient() {
   const streamRef = useRef<MediaStream | null>(null);
   const [captureSource, setCaptureSource] = useState<PictureSource>("");
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [isTransformingImage, setIsTransformingImage] = useState(false);
 
@@ -135,13 +136,38 @@ function PictureOnboardingClient() {
     }
 
     if (videoRef.current) {
+      videoRef.current.pause();
       videoRef.current.srcObject = null;
     }
 
     setIsCameraOpen(false);
+    setIsCameraReady(false);
   }, []);
 
   useEffect(() => stopCamera, [stopCamera]);
+
+  useEffect(() => {
+    if (!isCameraOpen || !streamRef.current || !videoRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+
+    const markReady = () => {
+      setIsCameraReady(video.videoWidth > 0 && video.videoHeight > 0);
+    };
+
+    video.onloadedmetadata = markReady;
+    void video.play().then(markReady).catch(() => {
+      setCameraError("We couldn't start the live camera preview.");
+      setIsCameraReady(false);
+    });
+
+    return () => {
+      video.onloadedmetadata = null;
+    };
+  }, [isCameraOpen]);
 
   useEffect(() => {
     if (isHydratingFiles) {
@@ -216,6 +242,7 @@ function PictureOnboardingClient() {
   const openCamera = useCallback(async () => {
     clearSaveFeedback();
     setCameraError("");
+    setIsCameraReady(false);
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("This browser does not support camera capture.");
@@ -236,11 +263,6 @@ function PictureOnboardingClient() {
       streamRef.current = stream;
       setCaptureSource("camera");
       setIsCameraOpen(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
     } catch (error) {
       setCameraError(
         error instanceof Error && error.message
@@ -253,7 +275,7 @@ function PictureOnboardingClient() {
   const capturePhoto = useCallback(async () => {
     const video = videoRef.current;
 
-    if (!video || !video.videoWidth || !video.videoHeight) {
+    if (!video || !isCameraReady || !video.videoWidth || !video.videoHeight) {
       setCameraError("Camera preview is not ready yet.");
       return;
     }
@@ -283,7 +305,7 @@ function PictureOnboardingClient() {
       new File([blob], `camera-capture-${Date.now()}.jpg`, { type: "image/jpeg" }),
       "camera",
     );
-  }, [applyPicture, stopCamera]);
+  }, [applyPicture, isCameraReady, stopCamera]);
 
   const runAiTransform = useCallback(async () => {
     if (!originalFile || isTransformingImage || isSavingSection) {
@@ -433,7 +455,6 @@ function PictureOnboardingClient() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="user"
           onChange={onFileChange}
           hidden
         />
