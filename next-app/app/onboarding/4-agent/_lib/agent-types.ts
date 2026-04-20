@@ -50,3 +50,11 @@ export type AgentOnboardingState = {
 export type AgentPromptSettings = {
   interviewerSystemPrompt: string;
 };
+
+export type AgentVoiceConnectionStatus =
+  | "idle"
+  | "requesting-permission"
+  | "connecting"
+  | "connected"
+  | "disconnecting"
+  | "error";

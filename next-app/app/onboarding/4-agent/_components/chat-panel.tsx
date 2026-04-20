@@ -5,6 +5,7 @@ import type {
   AgentConversationMode,
   AgentConversationStatus,
   AgentTranscriptItem,
+  AgentVoiceConnectionStatus,
 } from "../_lib/agent-types";
 import { TextInputBar } from "./text-input-bar";
 import { TranscriptMessageList } from "./transcript-message-list";
@@ -15,10 +16,14 @@ type ChatPanelProps = {
   status: AgentConversationStatus;
   transcript: AgentTranscriptItem[];
   voiceStatusMessage: string;
+  voiceConnectionStatus?: AgentVoiceConnectionStatus;
+  liveVoiceTranscript?: string;
   isSubmittingTurn?: boolean;
   finalSummary: string | null;
   onSubmitTextTurn: (value: string) => void;
   onConfirmConversation: () => void;
+  onConnectVoice: () => void;
+  onDisconnectVoice: () => void;
 };
 
 export function ChatPanel({
@@ -26,10 +31,14 @@ export function ChatPanel({
   status,
   transcript,
   voiceStatusMessage,
+  voiceConnectionStatus = "idle",
+  liveVoiceTranscript = "",
   isSubmittingTurn = false,
   finalSummary,
   onSubmitTextTurn,
   onConfirmConversation,
+  onConnectVoice,
+  onDisconnectVoice,
 }: ChatPanelProps) {
   const showComposer = selectedMode === "text" && status !== "confirming" && status !== "complete";
 
@@ -66,7 +75,13 @@ export function ChatPanel({
       </div>
 
       {selectedMode === "voice" ? (
-        <VoiceSessionPanel statusMessage={voiceStatusMessage} />
+        <VoiceSessionPanel
+          statusMessage={voiceStatusMessage}
+          connectionStatus={voiceConnectionStatus}
+          liveTranscript={liveVoiceTranscript}
+          onConnect={onConnectVoice}
+          onDisconnect={onDisconnectVoice}
+        />
       ) : null}
 
       {!selectedMode ? (

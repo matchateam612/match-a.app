@@ -12,6 +12,7 @@ import type { SubmitAgentTurnResponse } from "../_lib/agent-api-types";
 import { defaultAgentCriteria } from "../_lib/agent-criteria";
 import { buildDraftSummary, buildStarterAssistantMessage, createTranscriptItem } from "../_lib/agent-orchestrator";
 import { hasAgentDraftContent, persistAgentState, readAgentPromptSettings, readStoredAgentState, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
+import { useAgentVoiceSession } from "../_lib/use-agent-voice-session";
 import { getVoiceScaffoldStatus } from "../_lib/agent-voice";
 import type { AgentOnboardingState, AgentConversationMode } from "../_lib/agent-types";
 import { AgentLayout } from "./agent-layout";
@@ -220,6 +221,47 @@ function AgentOnboardingClient() {
     ],
   );
 
+  const { connectionStatus, liveTranscript, connect, disconnect } = useAgentVoiceSession({
+    enabled: draft.selectedMode === "voice" && draft.status !== "complete",
+    transcript: draft.transcript,
+    criteria: draft.criteria,
+    criteriaDefinitions,
+    promptSettings,
+    onUserTranscript: (message) => {
+      setDraft((current) => ({
+        ...current,
+        turnCount: current.turnCount + 1,
+        transcript: [...current.transcript, message],
+      }));
+    },
+    onAssistantTurn: (payload) => {
+      setDraft((current) => ({
+        ...current,
+        criteria: payload.criteria,
+        transcript: [
+          ...current.transcript,
+          createTranscriptItem({
+            role: "assistant",
+            modality: "voice",
+            text: payload.assistantMessage,
+          }),
+        ],
+        status: payload.status,
+        finalSummary: payload.draftSummary,
+        lastAskedCriterionId: payload.lastAskedCriterionId,
+      }));
+    },
+    onStatusChange: (status) => {
+      setProgress(status);
+    },
+    onError: (message) => {
+      setSaveError(message);
+    },
+    onInfo: (message) => {
+      setSaveMessage(message);
+    },
+  });
+
   const draftSummary = buildDraftSummary(draft.criteria);
   const criteriaJson = JSON.stringify(draft.criteria, null, 2);
 
@@ -279,9 +321,13 @@ function AgentOnboardingClient() {
         status={draft.status}
         transcript={draft.transcript}
         voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
+        voiceConnectionStatus={connectionStatus}
+        liveVoiceTranscript={liveTranscript}
         finalSummary={draft.finalSummary}
         onSubmitTextTurn={onSubmitTextTurn}
         isSubmittingTurn={isSubmittingTurn}
+        onConnectVoice={connect}
+        onDisconnectVoice={disconnect}
         onConfirmConversation={() => {
           setDraft((current) => ({
             ...current,
