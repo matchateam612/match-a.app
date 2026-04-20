@@ -1,10 +1,5 @@
-import { AuthTestForm } from "./_components/auth-test-form";
+import { AuthScreen } from "@/features/auth/components/auth-screen";
 
 export default function SignInPage() {
-  return (
-    <main>
-      <h1>Sign in</h1>
-      <AuthTestForm />
-    </main>
-  );
+  return <AuthScreen mode="signin" />;
 }

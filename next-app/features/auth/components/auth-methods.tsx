@@ -1,17 +1,7 @@
-import styles from "../page.module.scss";
+import styles from "../auth-page.module.scss";
+import { futureMethods } from "../lib/auth-copy";
 
-const futureMethods = [
-  {
-    title: "Continue with Google",
-    copy: "Reserved for the next auth method rollout.",
-  },
-  {
-    title: "More sign-in options",
-    copy: "Apple, magic links, or phone can live here later.",
-  },
-];
-
-export function SignupMethods() {
+export function AuthMethods() {
   return (
     <div>
       <div className={styles.divider}>More ways to join</div>

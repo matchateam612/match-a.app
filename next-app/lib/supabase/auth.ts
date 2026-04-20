@@ -54,3 +54,17 @@ export async function signOutCurrentUser() {
     throw error;
   }
 }
+
+export async function resendSignupVerificationEmail(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
