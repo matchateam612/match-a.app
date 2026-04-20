@@ -10,6 +10,7 @@ import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboardi
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import type {
   CreateInitialAgentTurnResponse,
+  CreateInitialVoiceTurnContextRequest,
   SubmitAgentTurnResponse,
 } from "../_lib/agent-api-types";
 import { defaultAgentCriteria } from "../_lib/agent-criteria";
@@ -124,7 +125,7 @@ function AgentOnboardingClient() {
     persistState,
   });
 
-  const { connectionStatus, liveTranscript, connect, disconnect, queueAssistantMessage } = useAgentVoiceSession({
+  const { connectionStatus, liveTranscript, connect, disconnect, queueInitialVoiceTurnContext } = useAgentVoiceSession({
     enabled: draft.selectedMode === "voice" && draft.status !== "complete",
     transcript: draft.transcript,
     criteria: draft.criteria,
@@ -165,6 +166,26 @@ function AgentOnboardingClient() {
     },
   });
 
+  const buildInitialVoiceTurnContext = useCallback(
+    (nextDraft: AgentOnboardingState): CreateInitialVoiceTurnContextRequest => ({
+      selectedMode: "voice",
+      criteriaDefinitions,
+      criteria: nextDraft.criteria,
+      interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
+      userInfo: buildUserInfo({
+        draft: nextDraft,
+        progress,
+        storedUserInfo: readStoredAgentState(defaultAgentCriteria).userInfo,
+      }),
+    }),
+    [
+      buildUserInfo,
+      criteriaDefinitions,
+      progress,
+      promptSettings.interviewerSystemPrompt,
+    ],
+  );
+
   const onSelectMode = useCallback(
     async (mode: AgentConversationMode) => {
       if (isPreparingConversation) {
@@ -198,10 +219,7 @@ function AgentOnboardingClient() {
           setDraft(nextDraft);
           setProgress(nextDraft.status);
           if (mode === "voice") {
-            const firstAssistantMessage = nextDraft.transcript.find(
-              (item) => item.role === "assistant",
-            )?.text;
-            queueAssistantMessage(firstAssistantMessage ?? null);
+            queueInitialVoiceTurnContext(buildInitialVoiceTurnContext(nextDraft));
           }
           return;
         }
@@ -250,8 +268,14 @@ function AgentOnboardingClient() {
         setProgress(payload.status);
 
         if (mode === "voice") {
-          queueAssistantMessage(payload.assistantMessage);
-          setSaveMessage("Voice mode selected. The first assistant question is now generated from your stored onboarding context and will be spoken after voice connects.");
+          queueInitialVoiceTurnContext(buildInitialVoiceTurnContext({
+            ...nextDraft,
+            transcript: [initialTranscriptItem],
+            status: payload.status,
+            finalSummary: payload.draftSummary,
+            lastAskedCriterionId: payload.lastAskedCriterionId,
+          }));
+          setSaveMessage("Voice mode selected. The first assistant turn is now prepared from your stored onboarding context and will be generated through the voice session after connect.");
         } else {
           setSaveMessage("Text mode selected. The first assistant message is now generated from your stored onboarding context.");
         }
@@ -266,12 +290,13 @@ function AgentOnboardingClient() {
     },
     [
       buildUserInfo,
+      buildInitialVoiceTurnContext,
       criteriaDefinitions,
       draft,
       isPreparingConversation,
       progress,
       promptSettings.interviewerSystemPrompt,
-      queueAssistantMessage,
+      queueInitialVoiceTurnContext,
       setDraft,
       setProgress,
       setSaveError,

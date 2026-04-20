@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
+  CreateInitialVoiceTurnContextRequest,
   CreateVoiceTurnContextResponse,
   ResolveAgentTurnExtractionResponse,
   SubmitAgentTurnResponse,
@@ -29,6 +30,8 @@ type UseAgentVoiceSessionOptions = {
   onError: (message: string) => void;
   onInfo: (message: string) => void;
 };
+
+type InitialVoiceTurnContextOptions = CreateInitialVoiceTurnContextRequest;
 
 type RealtimeServerEvent = {
   type?: string;
@@ -102,7 +105,7 @@ export function useAgentVoiceSession({
   const criteriaDefinitionsRef = useRef(criteriaDefinitions);
   const onAssistantTurnRef = useRef(onAssistantTurn);
   const onStatusChangeRef = useRef(onStatusChange);
-  const initialPlaybackRef = useRef<string | null>(null);
+  const initialVoiceTurnContextRef = useRef<InitialVoiceTurnContextOptions | null>(null);
   const pendingAssistantTranscriptRef = useRef("");
   const pendingVoiceTurnResolutionRef = useRef<Promise<ResolveAgentTurnExtractionResponse> | null>(null);
   const pendingVoiceTurnSnapshotRef = useRef<{
@@ -164,41 +167,6 @@ export function useAgentVoiceSession({
 
   useEffect(() => disconnect, [disconnect]);
 
-  const speakAssistantMessage = useCallback((assistantMessage: string) => {
-    const channel = dataChannelRef.current;
-
-    if (!channel || channel.readyState !== "open") {
-      return;
-    }
-
-    channel.send(
-      JSON.stringify({
-        type: "response.create",
-        response: {
-          conversation: "none",
-          output_modalities: ["audio"],
-          instructions:
-            "Speak the following dating-app onboarding reply naturally and clearly. Preserve the meaning and stay concise.",
-          input: [
-            {
-              type: "message",
-              role: "user",
-              content: [
-                {
-                  type: "input_text",
-                  text: assistantMessage,
-                },
-              ],
-            },
-          ],
-          metadata: {
-            response_purpose: "voice_playback",
-          },
-        },
-      }),
-    );
-  }, []);
-
   const requestRealtimeResponse = useCallback(({
     instructions,
     inputText,
@@ -241,9 +209,47 @@ export function useAgentVoiceSession({
     );
   }, []);
 
-  const queueAssistantMessage = useCallback((assistantMessage: string | null) => {
-    initialPlaybackRef.current = assistantMessage && assistantMessage.trim() ? assistantMessage : null;
+  const queueInitialVoiceTurnContext = useCallback((options: InitialVoiceTurnContextOptions | null) => {
+    initialVoiceTurnContextRef.current = options;
   }, []);
+
+  const requestInitialVoiceTurn = useCallback(async () => {
+    const pendingContext = initialVoiceTurnContextRef.current;
+
+    if (!pendingContext) {
+      return;
+    }
+
+    const response = await fetch("/api/agent-turn/initial-voice-context", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(pendingContext),
+    });
+
+    const payload = (await response.json()) as CreateVoiceTurnContextResponse | { error?: string };
+
+    if (!response.ok || !isCreateVoiceTurnContextResponse(payload)) {
+      throw new Error(
+        "error" in payload && payload.error
+          ? payload.error
+          : "Initial voice turn context preparation failed.",
+      );
+    }
+
+    initialVoiceTurnContextRef.current = null;
+    pendingVoiceTurnSnapshotRef.current = {
+      draftSummary: payload.draftSummary,
+      status: payload.status,
+      lastAskedCriterionId: payload.lastAskedCriterionId,
+    };
+    onStatusChangeRef.current?.(payload.status);
+    requestRealtimeResponse({
+      instructions: payload.instructions,
+      inputText: payload.inputText,
+    });
+  }, [requestRealtimeResponse]);
 
   const processVoiceTurn = useCallback(
     async (userMessage: string) => {
@@ -396,10 +402,13 @@ export function useAgentVoiceSession({
         console.log("[agent-voice] Realtime data channel opened.");
         onInfo("Voice connection ready. Speak naturally and the same agent logic will process each completed turn.");
 
-        if (initialPlaybackRef.current) {
-          const pendingMessage = initialPlaybackRef.current;
-          initialPlaybackRef.current = null;
-          speakAssistantMessage(pendingMessage);
+        if (initialVoiceTurnContextRef.current) {
+          void requestInitialVoiceTurn().catch((error) => {
+            console.error("[agent-voice] Failed to request initial voice turn.", error);
+            onError(
+              error instanceof Error ? error.message : "The initial voice turn could not be started.",
+            );
+          });
         }
       });
 
@@ -423,8 +432,26 @@ export function useAgentVoiceSession({
             serverEvent.type === "response.audio_transcript.delta" ||
             serverEvent.type === "response.text.delta"
           ) {
-            pendingAssistantTranscriptRef.current +=
-              serverEvent.delta ?? serverEvent.transcript ?? serverEvent.text ?? "";
+            const nextDelta = serverEvent.delta ?? serverEvent.transcript ?? serverEvent.text ?? "";
+
+            if (nextDelta) {
+              pendingAssistantTranscriptRef.current += nextDelta;
+            }
+            return;
+          }
+
+          if (
+            serverEvent.type === "response.audio_transcript.done" ||
+            serverEvent.type === "response.output_text.done"
+          ) {
+            const finalText = serverEvent.transcript ?? serverEvent.text ?? "";
+
+            if (
+              finalText &&
+              !pendingAssistantTranscriptRef.current.includes(finalText)
+            ) {
+              pendingAssistantTranscriptRef.current += finalText;
+            }
             return;
           }
 
@@ -515,13 +542,13 @@ export function useAgentVoiceSession({
         error instanceof Error ? error.message : "Could not connect the OpenAI Realtime voice session.",
       );
     }
-  }, [connectionStatus, disconnect, enabled, onError, onInfo, processVoiceTurn, speakAssistantMessage]);
+  }, [connectionStatus, disconnect, enabled, onError, onInfo, processVoiceTurn, requestInitialVoiceTurn]);
 
   return {
     connectionStatus,
     liveTranscript,
     connect,
     disconnect,
-    queueAssistantMessage,
+    queueInitialVoiceTurnContext,
   };
 }

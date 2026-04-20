@@ -7,6 +7,7 @@ import { getLlmEnv } from "@/lib/llm/env";
 import { summarizeCompletion } from "./agent-completion";
 import { buildDraftSummary, getNextCriterionToExplore } from "./agent-orchestrator";
 import type {
+  CreateInitialVoiceTurnContextRequest,
   CreateInitialAgentTurnRequest,
   CreateInitialAgentTurnResponse,
   CreateVoiceTurnContextResponse,
@@ -564,6 +565,45 @@ export function createVoiceTurnContext(
     draftSummary: snapshot.draftSummary,
     status: snapshot.status,
     lastAskedCriterionId: snapshot.lastAskedCriterionId,
+  };
+}
+
+export function createInitialVoiceTurnContext(
+  request: CreateInitialVoiceTurnContextRequest,
+): CreateVoiceTurnContextResponse {
+  const nextCriterion = getNextCriterionToExplore(request.criteria);
+  const draftSummary = buildDraftSummary(request.criteria);
+  const priorOnboardingContext = buildPriorOnboardingContext(request.userInfo);
+  const completion = summarizeCompletion(request.criteria);
+
+  return {
+    instructions:
+      "You are the spoken interviewer for a dating app onboarding flow. Read the provided app-generated turn context and produce the first spoken assistant reply. Sound warm and natural. Ask one focused question at a time. Do not mention JSON, internal state, or scores. Use the prior onboarding context to start with the most relevant next question.",
+    inputText: JSON.stringify(
+      {
+        productSystemPrompt: request.interviewerSystemPrompt,
+        selectedMode: request.selectedMode,
+        criteriaDefinitions: request.criteriaDefinitions,
+        currentCriteria: request.criteria,
+        draftSummary,
+        transcript: [],
+        latestUserMessage: null,
+        nextCriterion: nextCriterion
+          ? {
+              id: nextCriterion.id,
+              label: nextCriterion.label,
+              description: nextCriterion.description,
+            }
+          : null,
+        priorOnboardingContext,
+        isFirstTurn: true,
+      },
+      null,
+      2,
+    ),
+    draftSummary,
+    status: completion.readyToConfirm ? "confirming" : "collecting",
+    lastAskedCriterionId: nextCriterion?.id ?? null,
   };
 }
 
