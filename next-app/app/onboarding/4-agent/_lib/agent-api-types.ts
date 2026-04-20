@@ -4,6 +4,7 @@ import type {
   AgentCriterionState,
   AgentTranscriptItem,
 } from "./agent-types";
+import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 
 export type SubmitAgentTurnRequest = {
   selectedMode: AgentConversationMode;
@@ -14,6 +15,14 @@ export type SubmitAgentTurnRequest = {
   interviewerSystemPrompt: string;
 };
 
+export type CreateInitialAgentTurnRequest = {
+  selectedMode: AgentConversationMode;
+  criteriaDefinitions: AgentCriterionDefinition[];
+  criteria: AgentCriterionState[];
+  interviewerSystemPrompt: string;
+  userInfo: UserInfo;
+};
+
 export type SubmitAgentTurnResponse = {
   criteria: AgentCriterionState[];
   assistantMessage: string;
@@ -21,4 +30,11 @@ export type SubmitAgentTurnResponse = {
   status: "collecting" | "confirming" | "complete";
   lastAskedCriterionId: string | null;
   extractorRawOutput: string;
+};
+
+export type CreateInitialAgentTurnResponse = {
+  assistantMessage: string;
+  draftSummary: string;
+  status: "collecting" | "confirming" | "complete";
+  lastAskedCriterionId: string | null;
 };

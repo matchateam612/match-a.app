@@ -5,10 +5,14 @@ import type { AgentTranscriptItem } from "../_lib/agent-types";
 
 type TranscriptMessageListProps = {
   transcript: AgentTranscriptItem[];
+  pendingAssistantMessage?: string;
 };
 
-export function TranscriptMessageList({ transcript }: TranscriptMessageListProps) {
-  if (!transcript.length) {
+export function TranscriptMessageList({
+  transcript,
+  pendingAssistantMessage = "",
+}: TranscriptMessageListProps) {
+  if (!transcript.length && !pendingAssistantMessage) {
     return (
       <div
         className={styles.stackCard}
@@ -95,6 +99,50 @@ export function TranscriptMessageList({ transcript }: TranscriptMessageListProps
             </div>
           </article>
         ))}
+        {pendingAssistantMessage ? (
+          <article
+            style={{
+              display: "grid",
+              justifyItems: "start",
+            }}
+          >
+            <div
+              style={{
+                width: "min(100%, 640px)",
+                display: "grid",
+                gap: 6,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-start",
+                  gap: 10,
+                  fontSize: 12,
+                  color: "#64748b",
+                  textTransform: "capitalize",
+                }}
+              >
+                <span>assistant · streaming</span>
+                <span>{new Date().toLocaleTimeString()}</span>
+              </div>
+              <div
+                style={{
+                  borderRadius: "20px 20px 20px 8px",
+                  padding: "14px 16px",
+                  background: "#ffffff",
+                  color: "var(--color-text-primary)",
+                  border: "1px solid rgba(15, 23, 42, 0.08)",
+                  boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
+                }}
+              >
+                <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                  {pendingAssistantMessage}
+                </p>
+              </div>
+            </div>
+          </article>
+        ) : null}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ type ChatPanelProps = {
   selectedMode: AgentConversationMode | null;
   status: AgentConversationStatus;
   transcript: AgentTranscriptItem[];
+  pendingAssistantMessage?: string;
   voiceStatusMessage: string;
   voiceConnectionStatus?: AgentVoiceConnectionStatus;
   liveVoiceTranscript?: string;
@@ -30,6 +31,7 @@ export function ChatPanel({
   selectedMode,
   status,
   transcript,
+  pendingAssistantMessage = "",
   voiceStatusMessage,
   voiceConnectionStatus = "idle",
   liveVoiceTranscript = "",
@@ -93,7 +95,10 @@ export function ChatPanel({
         </div>
       ) : null}
 
-      <TranscriptMessageList transcript={transcript} />
+      <TranscriptMessageList
+        transcript={transcript}
+        pendingAssistantMessage={selectedMode === "text" ? pendingAssistantMessage : ""}
+      />
 
       {status === "confirming" ? (
         <div

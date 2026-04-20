@@ -93,6 +93,7 @@ export function useAgentVoiceSession({
   const transcriptRef = useRef(transcript);
   const promptSettingsRef = useRef(promptSettings);
   const criteriaDefinitionsRef = useRef(criteriaDefinitions);
+  const initialPlaybackRef = useRef<string | null>(null);
 
   useEffect(() => {
     criteriaRef.current = criteria;
@@ -174,6 +175,10 @@ export function useAgentVoiceSession({
     );
   }, []);
 
+  const queueAssistantMessage = useCallback((assistantMessage: string | null) => {
+    initialPlaybackRef.current = assistantMessage && assistantMessage.trim() ? assistantMessage : null;
+  }, []);
+
   const processVoiceTurn = useCallback(
     async (userMessage: string) => {
       const normalizedMessage = userMessage.trim();
@@ -219,7 +224,7 @@ export function useAgentVoiceSession({
         speakAssistantMessage(payload.assistantMessage);
       }
     },
-    [onAssistantTurn, onError, onStatusChange, onUserTranscript, speakAssistantMessage],
+    [onAssistantTurn, onStatusChange, onUserTranscript, speakAssistantMessage],
   );
 
   const connect = useCallback(async () => {
@@ -288,6 +293,12 @@ export function useAgentVoiceSession({
         setConnectionStatus("connected");
         console.log("[agent-voice] Realtime data channel opened.");
         onInfo("Voice connection ready. Speak naturally and the same agent logic will process each completed turn.");
+
+        if (initialPlaybackRef.current) {
+          const pendingMessage = initialPlaybackRef.current;
+          initialPlaybackRef.current = null;
+          speakAssistantMessage(pendingMessage);
+        }
       });
 
       dataChannel.addEventListener("message", async (event) => {
@@ -363,12 +374,13 @@ export function useAgentVoiceSession({
         error instanceof Error ? error.message : "Could not connect the OpenAI Realtime voice session.",
       );
     }
-  }, [connectionStatus, disconnect, enabled, onError, onInfo, processVoiceTurn]);
+  }, [connectionStatus, disconnect, enabled, onError, onInfo, processVoiceTurn, speakAssistantMessage]);
 
   return {
     connectionStatus,
     liveTranscript,
     connect,
     disconnect,
+    queueAssistantMessage,
   };
 }

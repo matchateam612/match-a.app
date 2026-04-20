@@ -8,9 +8,12 @@ import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
 import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
-import type { SubmitAgentTurnResponse } from "../_lib/agent-api-types";
+import type {
+  CreateInitialAgentTurnResponse,
+  SubmitAgentTurnResponse,
+} from "../_lib/agent-api-types";
 import { defaultAgentCriteria } from "../_lib/agent-criteria";
-import { buildDraftSummary, buildStarterAssistantMessage, createTranscriptItem } from "../_lib/agent-orchestrator";
+import { buildDraftSummary, createTranscriptItem } from "../_lib/agent-orchestrator";
 import { hasAgentDraftContent, persistAgentState, readAgentPromptSettings, readStoredAgentState, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
 import { useAgentVoiceSession } from "../_lib/use-agent-voice-session";
 import { getVoiceScaffoldStatus } from "../_lib/agent-voice";
@@ -31,6 +34,30 @@ function isSubmitAgentTurnResponse(
     "status" in payload
   );
 }
+
+function isCreateInitialAgentTurnResponse(
+  payload: CreateInitialAgentTurnResponse | { error?: string },
+): payload is CreateInitialAgentTurnResponse {
+  return (
+    "assistantMessage" in payload &&
+    "draftSummary" in payload &&
+    "status" in payload
+  );
+}
+
+type StreamedAgentTurnEvent =
+  | {
+      type: "assistant.delta";
+      delta: string;
+    }
+  | {
+      type: "assistant.done";
+      payload: SubmitAgentTurnResponse;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
 
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
@@ -53,6 +80,8 @@ export function AgentOnboarding() {
 function AgentOnboardingClient() {
   const router = useRouter();
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
+  const [isPreparingConversation, setIsPreparingConversation] = useState(false);
+  const [pendingAssistantMessage, setPendingAssistantMessage] = useState("");
   const promptSettings = readAgentPromptSettings();
   const criteriaDefinitions = readTestingCriteriaDefinitions();
 
@@ -95,133 +124,7 @@ function AgentOnboardingClient() {
     persistState,
   });
 
-  const onSelectMode = useCallback(
-    (mode: AgentConversationMode) => {
-      setSaveError("");
-      setSaveMessage(
-        mode === "voice"
-          ? "Voice mode selected. The realtime transport layer is scaffolded for later wiring."
-          : "Text mode selected. You can simulate turns below.",
-      );
-
-      setDraft((current) => {
-        if (current.selectedMode === mode && current.transcript.length) {
-          return current;
-        }
-
-        const starterTranscript =
-          current.transcript.length > 0
-            ? current.transcript
-            : [
-                createTranscriptItem({
-                  role: "assistant",
-                  modality: mode,
-                  text: buildStarterAssistantMessage(current.criteria),
-                }),
-              ];
-
-        return {
-          ...current,
-          selectedMode: mode,
-          transcript: starterTranscript,
-        };
-      });
-      setProgress("collecting");
-    },
-    [setDraft, setProgress, setSaveError, setSaveMessage],
-  );
-
-  const onSubmitTextTurn = useCallback(
-    async (value: string) => {
-      if (isSubmittingTurn || !draft.selectedMode) {
-        return;
-      }
-
-      setSaveError("");
-      setSaveMessage("");
-      setIsSubmittingTurn(true);
-
-      const userTranscriptItem = createTranscriptItem({
-        role: "user",
-        modality: "text",
-        text: value,
-      });
-
-      const requestTranscript = [...draft.transcript, userTranscriptItem];
-
-      setDraft((current) => ({
-        ...current,
-        turnCount: current.turnCount + 1,
-        transcript: requestTranscript,
-      }));
-
-      try {
-        const response = await fetch("/api/agent-turn", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            selectedMode: draft.selectedMode,
-            userMessage: value,
-            transcript: requestTranscript,
-            criteriaDefinitions,
-            criteria: draft.criteria,
-            interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
-          }),
-        });
-
-        const payload = (await response.json()) as SubmitAgentTurnResponse | { error?: string };
-
-        if (!response.ok || !isSubmitAgentTurnResponse(payload)) {
-          throw new Error(
-            "error" in payload && payload.error
-              ? payload.error
-              : "The agent turn request failed.",
-          );
-        }
-
-      setDraft((current) => ({
-        ...current,
-        criteria: payload.criteria,
-        transcript: [
-            ...requestTranscript,
-            createTranscriptItem({
-              role: "assistant",
-              modality: "text",
-              text: payload.assistantMessage,
-            }),
-          ],
-          status: payload.status,
-          finalSummary: payload.draftSummary,
-          lastAskedCriterionId: payload.lastAskedCriterionId,
-        }));
-
-        setProgress(payload.status);
-        setSaveMessage("Agent turn processed. Extracted criteria and next reply are now coming from the API route.");
-      } catch (error) {
-        setSaveError(
-          error instanceof Error ? error.message : "The agent turn could not be processed.",
-        );
-      } finally {
-        setIsSubmittingTurn(false);
-      }
-    },
-    [
-      criteriaDefinitions,
-      draft.criteria,
-      draft.selectedMode,
-      draft.transcript,
-      isSubmittingTurn,
-      promptSettings.interviewerSystemPrompt,
-      setDraft,
-      setProgress,
-      setSaveError,
-      setSaveMessage,
-    ],
-  );
-
-  const { connectionStatus, liveTranscript, connect, disconnect } = useAgentVoiceSession({
+  const { connectionStatus, liveTranscript, connect, disconnect, queueAssistantMessage } = useAgentVoiceSession({
     enabled: draft.selectedMode === "voice" && draft.status !== "complete",
     transcript: draft.transcript,
     criteria: draft.criteria,
@@ -261,6 +164,256 @@ function AgentOnboardingClient() {
       setSaveMessage(message);
     },
   });
+
+  const onSelectMode = useCallback(
+    async (mode: AgentConversationMode) => {
+      if (isPreparingConversation) {
+        return;
+      }
+
+      setSaveError("");
+      setSaveMessage(
+        mode === "voice"
+          ? "Preparing a real first voice prompt from your onboarding answers."
+          : "Preparing the first assistant message from your onboarding answers.",
+      );
+      setIsPreparingConversation(true);
+
+      try {
+        const nextDraft =
+          draft.selectedMode === mode && draft.transcript.length
+            ? draft
+            : {
+                ...draft,
+                selectedMode: mode,
+                transcript: [] as typeof draft.transcript,
+                turnCount: 0,
+                status: "collecting" as const,
+                finalSummary: null,
+                completedAt: null,
+                lastAskedCriterionId: null,
+              };
+
+        if (nextDraft.transcript.length > 0) {
+          setDraft(nextDraft);
+          setProgress(nextDraft.status);
+          if (mode === "voice") {
+            const firstAssistantMessage = nextDraft.transcript.find(
+              (item) => item.role === "assistant",
+            )?.text;
+            queueAssistantMessage(firstAssistantMessage ?? null);
+          }
+          return;
+        }
+
+        const response = await fetch("/api/agent-turn/initial", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            selectedMode: mode,
+            criteriaDefinitions,
+            criteria: nextDraft.criteria,
+            interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
+            userInfo: buildUserInfo({
+              draft: nextDraft,
+              progress,
+              storedUserInfo: readStoredAgentState(defaultAgentCriteria).userInfo,
+            }),
+          }),
+        });
+
+        const payload = (await response.json()) as CreateInitialAgentTurnResponse | { error?: string };
+
+        if (!response.ok || !isCreateInitialAgentTurnResponse(payload)) {
+          throw new Error(
+            "error" in payload && payload.error
+              ? payload.error
+              : "The initial agent turn request failed.",
+          );
+        }
+
+        const initialTranscriptItem = createTranscriptItem({
+          role: "assistant",
+          modality: mode,
+          text: payload.assistantMessage,
+        });
+
+        setDraft({
+          ...nextDraft,
+          transcript: [initialTranscriptItem],
+          status: payload.status,
+          finalSummary: payload.draftSummary,
+          lastAskedCriterionId: payload.lastAskedCriterionId,
+        });
+        setProgress(payload.status);
+
+        if (mode === "voice") {
+          queueAssistantMessage(payload.assistantMessage);
+          setSaveMessage("Voice mode selected. The first assistant question is now generated from your stored onboarding context and will be spoken after voice connects.");
+        } else {
+          setSaveMessage("Text mode selected. The first assistant message is now generated from your stored onboarding context.");
+        }
+      } catch (error) {
+        setSaveMessage("");
+        setSaveError(
+          error instanceof Error ? error.message : "Could not prepare the first assistant turn.",
+        );
+      } finally {
+        setIsPreparingConversation(false);
+      }
+    },
+    [
+      buildUserInfo,
+      criteriaDefinitions,
+      draft,
+      isPreparingConversation,
+      progress,
+      promptSettings.interviewerSystemPrompt,
+      queueAssistantMessage,
+      setDraft,
+      setProgress,
+      setSaveError,
+      setSaveMessage,
+    ],
+  );
+
+  const onSubmitTextTurn = useCallback(
+    async (value: string) => {
+      if (isSubmittingTurn || !draft.selectedMode) {
+        return;
+      }
+
+      setSaveError("");
+      setSaveMessage("");
+      setIsSubmittingTurn(true);
+      setPendingAssistantMessage("");
+
+      const userTranscriptItem = createTranscriptItem({
+        role: "user",
+        modality: "text",
+        text: value,
+      });
+
+      const requestTranscript = [...draft.transcript, userTranscriptItem];
+
+      setDraft((current) => ({
+        ...current,
+        turnCount: current.turnCount + 1,
+        transcript: requestTranscript,
+      }));
+
+      try {
+        const response = await fetch("/api/agent-turn/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            selectedMode: draft.selectedMode,
+            userMessage: value,
+            transcript: requestTranscript,
+            criteriaDefinitions,
+            criteria: draft.criteria,
+            interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
+          }),
+        });
+
+        if (!response.ok || !response.body) {
+          const payload = (await response.json()) as { error?: string };
+          throw new Error(payload.error || "The streamed agent turn request failed.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let completedPayload: SubmitAgentTurnResponse | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split("\n\n");
+          buffer = events.pop() ?? "";
+
+          for (const event of events) {
+            const line = event
+              .split("\n")
+              .map((entry) => entry.trim())
+              .find((entry) => entry.startsWith("data:"));
+
+            if (!line) {
+              continue;
+            }
+
+            const parsed = JSON.parse(line.slice("data:".length).trim()) as StreamedAgentTurnEvent;
+
+            if (parsed.type === "assistant.delta") {
+              setPendingAssistantMessage((current) => `${current}${parsed.delta}`);
+              continue;
+            }
+
+            if (parsed.type === "assistant.done") {
+              completedPayload = parsed.payload;
+              continue;
+            }
+
+            if (parsed.type === "error") {
+              throw new Error(parsed.message);
+            }
+          }
+        }
+
+        if (!completedPayload || !isSubmitAgentTurnResponse(completedPayload)) {
+          throw new Error("The streamed agent turn finished without a valid completion payload.");
+        }
+
+        setPendingAssistantMessage("");
+        setDraft((current) => ({
+          ...current,
+          criteria: completedPayload.criteria,
+          transcript: [
+            ...requestTranscript,
+            createTranscriptItem({
+              role: "assistant",
+              modality: "text",
+              text: completedPayload.assistantMessage,
+            }),
+          ],
+          status: completedPayload.status,
+          finalSummary: completedPayload.draftSummary,
+          lastAskedCriterionId: completedPayload.lastAskedCriterionId,
+        }));
+
+        setProgress(completedPayload.status);
+        setSaveMessage("Agent turn streamed successfully. The interviewer reply now appears progressively in text mode.");
+      } catch (error) {
+        setPendingAssistantMessage("");
+        setSaveError(
+          error instanceof Error ? error.message : "The agent turn could not be processed.",
+        );
+      } finally {
+        setIsSubmittingTurn(false);
+      }
+    },
+    [
+      criteriaDefinitions,
+      draft.criteria,
+      draft.selectedMode,
+      draft.transcript,
+      isSubmittingTurn,
+      promptSettings.interviewerSystemPrompt,
+      setDraft,
+      setProgress,
+      setSaveError,
+      setSaveMessage,
+    ],
+  );
 
   const draftSummary = buildDraftSummary(draft.criteria);
   const criteriaJson = JSON.stringify(draft.criteria, null, 2);
@@ -320,12 +473,13 @@ function AgentOnboardingClient() {
         selectedMode={draft.selectedMode}
         status={draft.status}
         transcript={draft.transcript}
+        pendingAssistantMessage={pendingAssistantMessage}
         voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
         voiceConnectionStatus={connectionStatus}
         liveVoiceTranscript={liveTranscript}
         finalSummary={draft.finalSummary}
         onSubmitTextTurn={onSubmitTextTurn}
-        isSubmittingTurn={isSubmittingTurn}
+        isSubmittingTurn={isSubmittingTurn || isPreparingConversation}
         onConnectVoice={connect}
         onDisconnectVoice={disconnect}
         onConfirmConversation={() => {

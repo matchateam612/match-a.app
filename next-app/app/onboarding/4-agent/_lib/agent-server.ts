@@ -1,8 +1,12 @@
-import { createOpenAiCompatibleChatCompletion } from "@/lib/llm/openai-compatible";
+import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
+import {
+  createOpenAiCompatibleChatCompletion,
+  createOpenAiCompatibleChatCompletionStream,
+} from "@/lib/llm/openai-compatible";
 import { getLlmEnv } from "@/lib/llm/env";
 import { summarizeCompletion } from "./agent-completion";
 import { buildDraftSummary, getNextCriterionToExplore } from "./agent-orchestrator";
-import type { SubmitAgentTurnRequest } from "./agent-api-types";
+import type { CreateInitialAgentTurnRequest, CreateInitialAgentTurnResponse, SubmitAgentTurnRequest } from "./agent-api-types";
 import type {
   AgentCriterionDefinition,
   AgentCriterionState,
@@ -128,6 +132,22 @@ Rules:
 - If every criterion is strongly confirmed, stop asking new questions and give a concise confirmation summary of what you heard.
 - The confirmation message should clearly invite the user to review and confirm before the app ends the process.
 - Keep the response concise.`;
+}
+
+function buildPriorOnboardingContext(userInfo: UserInfo) {
+  return {
+    basicInfo: userInfo.basic_info ?? null,
+    mentality: userInfo.mentality ?? null,
+    mentalityProgress: userInfo.mentality_progress ?? null,
+    picture: userInfo.picture
+      ? {
+          source: typeof userInfo.picture === "object" ? (userInfo.picture as Record<string, unknown>).source ?? null : null,
+          hasSelectedImage: typeof userInfo.picture === "object"
+            ? Boolean((userInfo.picture as Record<string, unknown>).selectedImageUrl)
+            : false,
+        }
+      : null,
+  };
 }
 
 function buildInterviewerUserPrompt({
@@ -320,6 +340,119 @@ async function runInterviewer({
   });
 }
 
+async function runInterviewerStream({
+  request,
+  updatedCriteria,
+  draftSummary,
+}: {
+  request: SubmitAgentTurnRequest;
+  updatedCriteria: AgentCriterionState[];
+  draftSummary: string;
+}) {
+  const env = getLlmEnv();
+
+  console.log("[agent-turn][interviewer] Starting streaming interviewer step.", {
+    provider: env.provider,
+    baseUrl: env.baseUrl,
+    model: env.interviewerModel,
+    hasApiKey: Boolean(env.apiKey),
+  });
+
+  if (!env.apiKey) {
+    const fallbackMessage = await runInterviewer({
+      request,
+      updatedCriteria,
+      draftSummary,
+    });
+
+    async function* fallbackStream() {
+      yield fallbackMessage;
+    }
+
+    return fallbackStream();
+  }
+
+  return createOpenAiCompatibleChatCompletionStream({
+    model: env.interviewerModel,
+    temperature: 0.7,
+    messages: [
+      {
+        role: "system",
+        content: buildInterviewerSystemPrompt(),
+      },
+      {
+        role: "user",
+        content: buildInterviewerUserPrompt({
+          request,
+          updatedCriteria,
+          draftSummary,
+        }),
+      },
+    ],
+  });
+}
+
+async function runInitialInterviewer(request: CreateInitialAgentTurnRequest) {
+  const env = getLlmEnv();
+  const draftSummary = buildDraftSummary(request.criteria);
+  const nextCriterion = getNextCriterionToExplore(request.criteria);
+  const priorOnboardingContext = buildPriorOnboardingContext(request.userInfo);
+
+  console.log("[agent-turn][initial] Starting initial interviewer step.", {
+    provider: env.provider,
+    baseUrl: env.baseUrl,
+    model: env.interviewerModel,
+    hasApiKey: Boolean(env.apiKey),
+    selectedMode: request.selectedMode,
+    hasBasicInfo: Boolean(request.userInfo.basic_info),
+    hasMentality: Boolean(request.userInfo.mentality),
+  });
+
+  if (!env.apiKey) {
+    if (!nextCriterion) {
+      return "I have a strong starting picture of what you're looking for. I'll reflect it back so we can confirm the details together.";
+    }
+
+    return `I’ve got some context from your earlier onboarding answers. To get this conversation started, tell me a little about ${nextCriterion.label.toLowerCase()}.`;
+  }
+
+  return createOpenAiCompatibleChatCompletion({
+    model: env.interviewerModel,
+    temperature: 0.7,
+    messages: [
+      {
+        role: "system",
+        content: buildInterviewerSystemPrompt(),
+      },
+      {
+        role: "user",
+        content: JSON.stringify(
+          {
+            isFirstTurn: true,
+            selectedMode: request.selectedMode,
+            productSystemPrompt: request.interviewerSystemPrompt,
+            criteriaDefinitions: request.criteriaDefinitions,
+            criteria: request.criteria,
+            draftSummary,
+            nextCriterion: nextCriterion
+              ? {
+                  id: nextCriterion.id,
+                  label: nextCriterion.label,
+                  description: nextCriterion.description,
+                }
+              : null,
+            priorOnboardingContext,
+            transcript: [],
+            latestUserMessage: null,
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  });
+}
+
 export async function processAgentTurn(request: SubmitAgentTurnRequest) {
   console.log("[agent-turn] Processing new agent turn.", {
     selectedMode: request.selectedMode,
@@ -357,4 +490,99 @@ export async function processAgentTurn(request: SubmitAgentTurnRequest) {
   console.log("[agent-turn] Agent turn completed successfully.", responsePayload);
 
   return responsePayload;
+}
+
+export async function prepareAgentTurn(request: SubmitAgentTurnRequest) {
+  console.log("[agent-turn] Preparing agent turn for streaming.", {
+    selectedMode: request.selectedMode,
+    userMessage: request.userMessage,
+    transcriptCount: request.transcript.length,
+    criteriaCount: request.criteria.length,
+  });
+
+  const extractor = await runExtractor(request);
+  const updatedCriteria = mergeCriteria(request.criteria, extractor.parsedResult);
+  const draftSummary = buildDraftSummary(updatedCriteria);
+  const completion = summarizeCompletion(updatedCriteria);
+
+  return {
+    updatedCriteria,
+    draftSummary,
+    status: completion.readyToConfirm ? "confirming" as const : "collecting" as const,
+    lastAskedCriterionId: getNextCriterionToExplore(updatedCriteria)?.id ?? null,
+    extractorRawOutput: extractor.rawOutput,
+  };
+}
+
+export function prepareAgentTurnSnapshot(request: SubmitAgentTurnRequest) {
+  const draftSummary = buildDraftSummary(request.criteria);
+  const completion = summarizeCompletion(request.criteria);
+
+  return {
+    snapshotCriteria: request.criteria,
+    draftSummary,
+    status: completion.readyToConfirm ? "confirming" as const : "collecting" as const,
+    lastAskedCriterionId: getNextCriterionToExplore(request.criteria)?.id ?? null,
+  };
+}
+
+export async function resolveAgentTurnExtraction(request: SubmitAgentTurnRequest) {
+  try {
+    const extractor = await runExtractor(request);
+    const updatedCriteria = mergeCriteria(request.criteria, extractor.parsedResult);
+    const draftSummary = buildDraftSummary(updatedCriteria);
+    const completion = summarizeCompletion(updatedCriteria);
+
+    return {
+      criteria: updatedCriteria,
+      draftSummary,
+      status: completion.readyToConfirm ? "confirming" as const : "collecting" as const,
+      lastAskedCriterionId: getNextCriterionToExplore(updatedCriteria)?.id ?? null,
+      extractorRawOutput: extractor.rawOutput,
+    };
+  } catch (error) {
+    console.error("[agent-turn] Extraction resolution failed. Falling back to turn snapshot criteria.", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    const snapshot = prepareAgentTurnSnapshot(request);
+
+    return {
+      criteria: snapshot.snapshotCriteria,
+      draftSummary: snapshot.draftSummary,
+      status: snapshot.status,
+      lastAskedCriterionId: snapshot.lastAskedCriterionId,
+      extractorRawOutput: "",
+    };
+  }
+}
+
+export async function streamPreparedAgentTurn({
+  request,
+  updatedCriteria,
+  draftSummary,
+}: {
+  request: SubmitAgentTurnRequest;
+  updatedCriteria: AgentCriterionState[];
+  draftSummary: string;
+}) {
+  return runInterviewerStream({
+    request,
+    updatedCriteria,
+    draftSummary,
+  });
+}
+
+export async function createInitialAgentTurn(
+  request: CreateInitialAgentTurnRequest,
+): Promise<CreateInitialAgentTurnResponse> {
+  const assistantMessage = await runInitialInterviewer(request);
+  const completion = summarizeCompletion(request.criteria);
+
+  return {
+    assistantMessage,
+    draftSummary: buildDraftSummary(request.criteria),
+    status: completion.readyToConfirm ? "confirming" : "collecting",
+    lastAskedCriterionId: getNextCriterionToExplore(request.criteria)?.id ?? null,
+  };
 }
