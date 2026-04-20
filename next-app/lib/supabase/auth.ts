@@ -26,6 +26,9 @@ export async function signUpWithEmailPassword({
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: getEmailVerificationRedirectUrl(),
+    },
   });
 
   if (error) {
@@ -60,6 +63,9 @@ export async function resendSignupVerificationEmail(email: string) {
   const { data, error } = await supabase.auth.resend({
     type: "signup",
     email,
+    options: {
+      emailRedirectTo: getEmailVerificationRedirectUrl(),
+    },
   });
 
   if (error) {
@@ -75,6 +81,12 @@ function getBrowserOrigin() {
   }
 
   return window.location.origin;
+}
+
+function getEmailVerificationRedirectUrl() {
+  const origin = getBrowserOrigin();
+
+  return origin ? `${origin}/signin?message=email-verified` : undefined;
 }
 
 export async function sendPasswordResetEmail(email: string) {

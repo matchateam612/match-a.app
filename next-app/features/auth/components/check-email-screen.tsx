@@ -17,7 +17,9 @@ type CheckEmailScreenProps = {
 export function CheckEmailScreen({ email }: CheckEmailScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState(AUTH_SUCCESS_MESSAGES.emailVerificationReady);
+  const [successMessage, setSuccessMessage] = useState<string>(
+    AUTH_SUCCESS_MESSAGES.emailVerificationReady,
+  );
 
   async function handleResend() {
     setIsSubmitting(true);
