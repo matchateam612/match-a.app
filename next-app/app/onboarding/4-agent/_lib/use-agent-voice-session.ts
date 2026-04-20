@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SubmitAgentTurnResponse } from "./agent-api-types";
+import type {
+  CreateVoiceTurnContextResponse,
+  ResolveAgentTurnExtractionResponse,
+  SubmitAgentTurnResponse,
+} from "./agent-api-types";
 import type { CreateRealtimeSessionResponse } from "./agent-voice-types";
 import type {
   AgentConversationStatus,
@@ -29,19 +33,10 @@ type UseAgentVoiceSessionOptions = {
 type RealtimeServerEvent = {
   type?: string;
   transcript?: string;
+  delta?: string;
+  text?: string;
   response?: { status?: string };
 };
-
-function isSubmitAgentTurnResponse(
-  payload: SubmitAgentTurnResponse | { error?: string },
-): payload is SubmitAgentTurnResponse {
-  return (
-    "criteria" in payload &&
-    "assistantMessage" in payload &&
-    "draftSummary" in payload &&
-    "status" in payload
-  );
-}
 
 function isCreateRealtimeSessionResponse(
   payload: CreateRealtimeSessionResponse | { error?: string },
@@ -59,6 +54,18 @@ function getRealtimeEphemeralKey(payload: CreateRealtimeSessionResponse) {
   }
 
   return "";
+}
+
+function isCreateVoiceTurnContextResponse(
+  payload: CreateVoiceTurnContextResponse | { error?: string },
+): payload is CreateVoiceTurnContextResponse {
+  return "instructions" in payload && "inputText" in payload && "status" in payload;
+}
+
+function isResolveAgentTurnExtractionResponse(
+  payload: ResolveAgentTurnExtractionResponse | { error?: string },
+): payload is ResolveAgentTurnExtractionResponse {
+  return "criteria" in payload && "draftSummary" in payload && "status" in payload;
 }
 
 function createVoiceTranscriptItem(text: string, role: "assistant" | "user"): AgentTranscriptItem {
@@ -93,7 +100,16 @@ export function useAgentVoiceSession({
   const transcriptRef = useRef(transcript);
   const promptSettingsRef = useRef(promptSettings);
   const criteriaDefinitionsRef = useRef(criteriaDefinitions);
+  const onAssistantTurnRef = useRef(onAssistantTurn);
+  const onStatusChangeRef = useRef(onStatusChange);
   const initialPlaybackRef = useRef<string | null>(null);
+  const pendingAssistantTranscriptRef = useRef("");
+  const pendingVoiceTurnResolutionRef = useRef<Promise<ResolveAgentTurnExtractionResponse> | null>(null);
+  const pendingVoiceTurnSnapshotRef = useRef<{
+    draftSummary: string;
+    status: AgentConversationStatus;
+    lastAskedCriterionId: string | null;
+  } | null>(null);
 
   useEffect(() => {
     criteriaRef.current = criteria;
@@ -110,6 +126,14 @@ export function useAgentVoiceSession({
   useEffect(() => {
     criteriaDefinitionsRef.current = criteriaDefinitions;
   }, [criteriaDefinitions]);
+
+  useEffect(() => {
+    onAssistantTurnRef.current = onAssistantTurn;
+  }, [onAssistantTurn]);
+
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  }, [onStatusChange]);
 
   const disconnect = useCallback(() => {
     setConnectionStatus("disconnecting");
@@ -175,6 +199,48 @@ export function useAgentVoiceSession({
     );
   }, []);
 
+  const requestRealtimeResponse = useCallback(({
+    instructions,
+    inputText,
+  }: {
+    instructions: string;
+    inputText: string;
+  }) => {
+    const channel = dataChannelRef.current;
+
+    if (!channel || channel.readyState !== "open") {
+      return;
+    }
+
+    pendingAssistantTranscriptRef.current = "";
+
+    channel.send(
+      JSON.stringify({
+        type: "response.create",
+        response: {
+          conversation: "none",
+          output_modalities: ["audio", "text"],
+          instructions,
+          input: [
+            {
+              type: "message",
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: inputText,
+                },
+              ],
+            },
+          ],
+          metadata: {
+            response_purpose: "voice_turn_response",
+          },
+        },
+      }),
+    );
+  }, []);
+
   const queueAssistantMessage = useCallback((assistantMessage: string | null) => {
     initialPlaybackRef.current = assistantMessage && assistantMessage.trim() ? assistantMessage : null;
   }, []);
@@ -191,8 +257,7 @@ export function useAgentVoiceSession({
       const requestTranscript = [...transcriptRef.current, userTranscriptItem];
 
       onUserTranscript(userTranscriptItem);
-
-      const response = await fetch("/api/agent-turn", {
+      const voiceContextResponse = await fetch("/api/agent-turn/voice-context", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -207,24 +272,61 @@ export function useAgentVoiceSession({
         }),
       });
 
-      const payload = (await response.json()) as SubmitAgentTurnResponse | { error?: string };
+      const voiceContextPayload = (await voiceContextResponse.json()) as
+        | CreateVoiceTurnContextResponse
+        | { error?: string };
 
-      if (!response.ok || !isSubmitAgentTurnResponse(payload)) {
+      if (!voiceContextResponse.ok || !isCreateVoiceTurnContextResponse(voiceContextPayload)) {
         throw new Error(
-          "error" in payload && payload.error
-            ? payload.error
-            : "Voice turn processing failed.",
+          "error" in voiceContextPayload && voiceContextPayload.error
+            ? voiceContextPayload.error
+            : "Voice turn context preparation failed.",
         );
       }
 
-      onAssistantTurn(payload);
-      onStatusChange?.(payload.status);
+      pendingVoiceTurnSnapshotRef.current = {
+        draftSummary: voiceContextPayload.draftSummary,
+        status: voiceContextPayload.status,
+        lastAskedCriterionId: voiceContextPayload.lastAskedCriterionId,
+      };
 
-      if (payload.status !== "complete") {
-        speakAssistantMessage(payload.assistantMessage);
-      }
+      pendingVoiceTurnResolutionRef.current = fetch("/api/agent-turn/extract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedMode: "voice",
+          userMessage: normalizedMessage,
+          transcript: requestTranscript,
+          criteriaDefinitions: criteriaDefinitionsRef.current,
+          criteria: criteriaRef.current,
+          interviewerSystemPrompt: promptSettingsRef.current.interviewerSystemPrompt,
+        }),
+      })
+        .then(async (response) => {
+          const payload = (await response.json()) as
+            | ResolveAgentTurnExtractionResponse
+            | { error?: string };
+
+          if (!response.ok || !isResolveAgentTurnExtractionResponse(payload)) {
+            throw new Error(
+              "error" in payload && payload.error
+                ? payload.error
+                : "Voice extraction update failed.",
+            );
+          }
+
+          return payload;
+        });
+
+      onStatusChangeRef.current?.(voiceContextPayload.status);
+      requestRealtimeResponse({
+        instructions: voiceContextPayload.instructions,
+        inputText: voiceContextPayload.inputText,
+      });
     },
-    [onAssistantTurn, onStatusChange, onUserTranscript, speakAssistantMessage],
+    [onUserTranscript, requestRealtimeResponse],
   );
 
   const connect = useCallback(async () => {
@@ -314,6 +416,45 @@ export function useAgentVoiceSession({
 
           if (serverEvent.type === "conversation.item.input_audio_transcription.delta") {
             setLiveTranscript((current) => `${current}${serverEvent.transcript ?? ""}`);
+            return;
+          }
+
+          if (
+            serverEvent.type === "response.audio_transcript.delta" ||
+            serverEvent.type === "response.text.delta"
+          ) {
+            pendingAssistantTranscriptRef.current +=
+              serverEvent.delta ?? serverEvent.transcript ?? serverEvent.text ?? "";
+            return;
+          }
+
+          if (serverEvent.type === "response.done") {
+            const assistantMessage = pendingAssistantTranscriptRef.current.trim();
+            const extractionResult = pendingVoiceTurnResolutionRef.current
+              ? await pendingVoiceTurnResolutionRef.current.catch((error) => {
+                  console.error("[agent-voice] Voice extraction resolution failed.", error);
+                  return null;
+                })
+              : null;
+            const snapshot = pendingVoiceTurnSnapshotRef.current;
+
+            pendingVoiceTurnResolutionRef.current = null;
+            pendingVoiceTurnSnapshotRef.current = null;
+
+            if (!assistantMessage) {
+              return;
+            }
+
+            onAssistantTurnRef.current({
+              criteria: extractionResult?.criteria ?? criteriaRef.current,
+              assistantMessage,
+              draftSummary: extractionResult?.draftSummary ?? snapshot?.draftSummary ?? "",
+              status: extractionResult?.status ?? snapshot?.status ?? "collecting",
+              lastAskedCriterionId:
+                extractionResult?.lastAskedCriterionId ?? snapshot?.lastAskedCriterionId ?? null,
+              extractorRawOutput: extractionResult?.extractorRawOutput ?? "",
+            });
+            onStatusChangeRef.current?.(extractionResult?.status ?? snapshot?.status ?? "collecting");
             return;
           }
         } catch (error) {

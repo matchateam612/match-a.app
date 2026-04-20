@@ -15,6 +15,14 @@ export type SubmitAgentTurnRequest = {
   interviewerSystemPrompt: string;
 };
 
+export type ResolveAgentTurnExtractionResponse = {
+  criteria: AgentCriterionState[];
+  draftSummary: string;
+  status: "collecting" | "confirming" | "complete";
+  lastAskedCriterionId: string | null;
+  extractorRawOutput: string;
+};
+
 export type CreateInitialAgentTurnRequest = {
   selectedMode: AgentConversationMode;
   criteriaDefinitions: AgentCriterionDefinition[];
@@ -37,4 +45,20 @@ export type CreateInitialAgentTurnResponse = {
   draftSummary: string;
   status: "collecting" | "confirming" | "complete";
   lastAskedCriterionId: string | null;
+};
+
+export type CreateVoiceTurnContextResponse = {
+  instructions: string;
+  inputText: string;
+  draftSummary: string;
+  status: "collecting" | "confirming" | "complete";
+  lastAskedCriterionId: string | null;
+};
+
+export type CreateInitialVoiceTurnContextRequest = {
+  selectedMode: AgentConversationMode;
+  criteriaDefinitions: AgentCriterionDefinition[];
+  criteria: AgentCriterionState[];
+  interviewerSystemPrompt: string;
+  userInfo: UserInfo;
 };

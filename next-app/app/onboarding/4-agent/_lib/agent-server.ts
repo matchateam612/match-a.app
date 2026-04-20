@@ -6,7 +6,13 @@ import {
 import { getLlmEnv } from "@/lib/llm/env";
 import { summarizeCompletion } from "./agent-completion";
 import { buildDraftSummary, getNextCriterionToExplore } from "./agent-orchestrator";
-import type { CreateInitialAgentTurnRequest, CreateInitialAgentTurnResponse, SubmitAgentTurnRequest } from "./agent-api-types";
+import type {
+  CreateInitialAgentTurnRequest,
+  CreateInitialAgentTurnResponse,
+  CreateVoiceTurnContextResponse,
+  ResolveAgentTurnExtractionResponse,
+  SubmitAgentTurnRequest,
+} from "./agent-api-types";
 import type {
   AgentCriterionDefinition,
   AgentCriterionState,
@@ -526,6 +532,41 @@ export function prepareAgentTurnSnapshot(request: SubmitAgentTurnRequest) {
   };
 }
 
+export function createVoiceTurnContext(
+  request: SubmitAgentTurnRequest,
+): CreateVoiceTurnContextResponse {
+  const snapshot = prepareAgentTurnSnapshot(request);
+  const nextCriterion = getNextCriterionToExplore(snapshot.snapshotCriteria);
+
+  return {
+    instructions:
+      "You are the spoken interviewer for a dating app onboarding flow. Read the provided app-generated turn context and produce the next spoken assistant reply. Sound warm and natural. Ask one focused question at a time. Do not mention JSON, internal state, or scores. If the context indicates the user is ready to confirm, give a concise spoken confirmation summary and invite confirmation.",
+    inputText: JSON.stringify(
+      {
+        productSystemPrompt: request.interviewerSystemPrompt,
+        selectedMode: request.selectedMode,
+        transcript: request.transcript,
+        currentCriteria: snapshot.snapshotCriteria,
+        draftSummary: snapshot.draftSummary,
+        latestUserMessage: request.userMessage,
+        nextCriterion: nextCriterion
+          ? {
+              id: nextCriterion.id,
+              label: nextCriterion.label,
+              description: nextCriterion.description,
+            }
+          : null,
+        isFirstTurn: false,
+      },
+      null,
+      2,
+    ),
+    draftSummary: snapshot.draftSummary,
+    status: snapshot.status,
+    lastAskedCriterionId: snapshot.lastAskedCriterionId,
+  };
+}
+
 export async function resolveAgentTurnExtraction(request: SubmitAgentTurnRequest) {
   try {
     const extractor = await runExtractor(request);
@@ -539,7 +580,7 @@ export async function resolveAgentTurnExtraction(request: SubmitAgentTurnRequest
       status: completion.readyToConfirm ? "confirming" as const : "collecting" as const,
       lastAskedCriterionId: getNextCriterionToExplore(updatedCriteria)?.id ?? null,
       extractorRawOutput: extractor.rawOutput,
-    };
+    } satisfies ResolveAgentTurnExtractionResponse;
   } catch (error) {
     console.error("[agent-turn] Extraction resolution failed. Falling back to turn snapshot criteria.", {
       error: error instanceof Error ? error.message : String(error),
@@ -553,7 +594,7 @@ export async function resolveAgentTurnExtraction(request: SubmitAgentTurnRequest
       status: snapshot.status,
       lastAskedCriterionId: snapshot.lastAskedCriterionId,
       extractorRawOutput: "",
-    };
+    } satisfies ResolveAgentTurnExtractionResponse;
   }
 }
 
