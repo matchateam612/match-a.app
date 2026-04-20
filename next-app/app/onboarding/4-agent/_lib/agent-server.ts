@@ -125,7 +125,8 @@ Rules:
 - Sound natural and warm.
 - Ask one focused thing at a time.
 - Do not mention internal scores or JSON.
-- If enough information has been gathered, summarize and confirm instead of probing further.
+- If every criterion is strongly confirmed, stop asking new questions and give a concise confirmation summary of what you heard.
+- The confirmation message should clearly invite the user to review and confirm before the app ends the process.
 - Keep the response concise.`;
 }
 

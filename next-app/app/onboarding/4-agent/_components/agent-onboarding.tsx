@@ -180,10 +180,10 @@ function AgentOnboardingClient() {
           );
         }
 
-        setDraft((current) => ({
-          ...current,
-          criteria: payload.criteria,
-          transcript: [
+      setDraft((current) => ({
+        ...current,
+        criteria: payload.criteria,
+        transcript: [
             ...requestTranscript,
             createTranscriptItem({
               role: "assistant",
@@ -192,7 +192,7 @@ function AgentOnboardingClient() {
             }),
           ],
           status: payload.status,
-          finalSummary: payload.status !== "collecting" ? payload.draftSummary : current.finalSummary,
+          finalSummary: payload.draftSummary,
           lastAskedCriterionId: payload.lastAskedCriterionId,
         }));
 
@@ -276,10 +276,21 @@ function AgentOnboardingClient() {
 
       <ChatPanel
         selectedMode={draft.selectedMode}
+        status={draft.status}
         transcript={draft.transcript}
         voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
+        finalSummary={draft.finalSummary}
         onSubmitTextTurn={onSubmitTextTurn}
         isSubmittingTurn={isSubmittingTurn}
+        onConfirmConversation={() => {
+          setDraft((current) => ({
+            ...current,
+            status: "complete",
+            completedAt: new Date().toISOString(),
+          }));
+          setProgress("complete");
+          setSaveMessage("Conversation confirmed and completed.");
+        }}
       />
 
       <AgentSummaryCard criteria={draft.criteria} finalSummary={draft.finalSummary} />
