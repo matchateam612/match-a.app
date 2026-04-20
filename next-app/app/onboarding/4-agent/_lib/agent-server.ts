@@ -12,6 +12,7 @@ import type {
   CreateInitialAgentTurnResponse,
   CreateVoiceTurnContextResponse,
   ResolveAgentTurnExtractionResponse,
+  SubmitAgentTurnResponse,
   SubmitAgentTurnRequest,
 } from "./agent-api-types";
 import type {
