@@ -499,28 +499,6 @@ export async function processAgentTurn(request: SubmitAgentTurnRequest) {
   return responsePayload;
 }
 
-export async function prepareAgentTurn(request: SubmitAgentTurnRequest) {
-  console.log("[agent-turn] Preparing agent turn for streaming.", {
-    selectedMode: request.selectedMode,
-    userMessage: request.userMessage,
-    transcriptCount: request.transcript.length,
-    criteriaCount: request.criteria.length,
-  });
-
-  const extractor = await runExtractor(request);
-  const updatedCriteria = mergeCriteria(request.criteria, extractor.parsedResult);
-  const draftSummary = buildDraftSummary(updatedCriteria);
-  const completion = summarizeCompletion(updatedCriteria);
-
-  return {
-    updatedCriteria,
-    draftSummary,
-    status: completion.readyToConfirm ? "confirming" as const : "collecting" as const,
-    lastAskedCriterionId: getNextCriterionToExplore(updatedCriteria)?.id ?? null,
-    extractorRawOutput: extractor.rawOutput,
-  };
-}
-
 export function prepareAgentTurnSnapshot(request: SubmitAgentTurnRequest) {
   const draftSummary = buildDraftSummary(request.criteria);
   const completion = summarizeCompletion(request.criteria);

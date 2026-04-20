@@ -18,6 +18,7 @@ type ChatPanelProps = {
   pendingAssistantMessage?: string;
   voiceStatusMessage: string;
   voiceConnectionStatus?: AgentVoiceConnectionStatus;
+  voiceActivityLabel?: string;
   liveVoiceTranscript?: string;
   isSubmittingTurn?: boolean;
   finalSummary: string | null;
@@ -34,6 +35,7 @@ export function ChatPanel({
   pendingAssistantMessage = "",
   voiceStatusMessage,
   voiceConnectionStatus = "idle",
+  voiceActivityLabel = "Waiting to connect",
   liveVoiceTranscript = "",
   isSubmittingTurn = false,
   finalSummary,
@@ -66,7 +68,7 @@ export function ChatPanel({
         <div>
           <span className={styles.inlineLabel}>AI conversation</span>
           <p className={styles.helper} style={{ marginTop: 6, marginBottom: 0 }}>
-            Familiar chat layout for testing the onboarding agent before voice is added.
+            Text and voice now share the same turn flow, transcript, and profile updates.
           </p>
         </div>
         {selectedMode ? (
@@ -80,6 +82,7 @@ export function ChatPanel({
         <VoiceSessionPanel
           statusMessage={voiceStatusMessage}
           connectionStatus={voiceConnectionStatus}
+          activityLabel={voiceActivityLabel}
           liveTranscript={liveVoiceTranscript}
           onConnect={onConnectVoice}
           onDisconnect={onDisconnectVoice}

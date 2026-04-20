@@ -95,6 +95,7 @@ export function useAgentVoiceSession({
 }: UseAgentVoiceSessionOptions) {
   const [connectionStatus, setConnectionStatus] = useState<AgentVoiceConnectionStatus>("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [activityLabel, setActivityLabel] = useState("Waiting to connect");
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -141,6 +142,7 @@ export function useAgentVoiceSession({
   const disconnect = useCallback(() => {
     setConnectionStatus("disconnecting");
     setLiveTranscript("");
+    setActivityLabel("Disconnecting");
 
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
@@ -157,6 +159,7 @@ export function useAgentVoiceSession({
     }
 
     setConnectionStatus("idle");
+    setActivityLabel("Waiting to connect");
   }, []);
 
   useEffect(() => {
@@ -181,6 +184,7 @@ export function useAgentVoiceSession({
     }
 
     pendingAssistantTranscriptRef.current = "";
+    setActivityLabel("Responding");
 
     channel.send(
       JSON.stringify({
@@ -245,6 +249,7 @@ export function useAgentVoiceSession({
       lastAskedCriterionId: payload.lastAskedCriterionId,
     };
     onStatusChangeRef.current?.(payload.status);
+    setActivityLabel("Responding");
     requestRealtimeResponse({
       instructions: payload.instructions,
       inputText: payload.inputText,
@@ -327,6 +332,7 @@ export function useAgentVoiceSession({
         });
 
       onStatusChangeRef.current?.(voiceContextPayload.status);
+      setActivityLabel("Responding");
       requestRealtimeResponse({
         instructions: voiceContextPayload.instructions,
         inputText: voiceContextPayload.inputText,
@@ -343,6 +349,7 @@ export function useAgentVoiceSession({
     try {
       setConnectionStatus("requesting-permission");
       setLiveTranscript("");
+      setActivityLabel("Preparing voice");
       console.log("[agent-voice] Starting voice connection flow.");
 
       const tokenResponse = await fetch("/api/agent-voice/session", {
@@ -378,6 +385,7 @@ export function useAgentVoiceSession({
       });
 
       setConnectionStatus("connecting");
+      setActivityLabel("Connecting to voice");
 
       const peerConnection = new RTCPeerConnection();
       peerConnectionRef.current = peerConnection;
@@ -399,8 +407,9 @@ export function useAgentVoiceSession({
 
       dataChannel.addEventListener("open", () => {
         setConnectionStatus("connected");
+        setActivityLabel("Listening");
         console.log("[agent-voice] Realtime data channel opened.");
-        onInfo("Voice connection ready. Speak naturally and the same agent logic will process each completed turn.");
+        onInfo("Voice connection ready. Speak naturally and the app will keep the conversation state in sync.");
 
         if (initialVoiceTurnContextRef.current) {
           void requestInitialVoiceTurn().catch((error) => {
@@ -419,11 +428,13 @@ export function useAgentVoiceSession({
 
           if (serverEvent.type === "conversation.item.input_audio_transcription.completed") {
             setLiveTranscript("");
+            setActivityLabel("Thinking through your reply");
             await processVoiceTurn(serverEvent.transcript ?? "");
             return;
           }
 
           if (serverEvent.type === "conversation.item.input_audio_transcription.delta") {
+            setActivityLabel("Listening");
             setLiveTranscript((current) => `${current}${serverEvent.transcript ?? ""}`);
             return;
           }
@@ -467,8 +478,10 @@ export function useAgentVoiceSession({
 
             pendingVoiceTurnResolutionRef.current = null;
             pendingVoiceTurnSnapshotRef.current = null;
+            pendingAssistantTranscriptRef.current = "";
 
             if (!assistantMessage) {
+              setActivityLabel("Listening");
               return;
             }
 
@@ -482,6 +495,7 @@ export function useAgentVoiceSession({
               extractorRawOutput: extractionResult?.extractorRawOutput ?? "",
             });
             onStatusChangeRef.current?.(extractionResult?.status ?? snapshot?.status ?? "collecting");
+            setActivityLabel("Listening");
             return;
           }
         } catch (error) {
@@ -491,10 +505,12 @@ export function useAgentVoiceSession({
 
       dataChannel.addEventListener("close", () => {
         setConnectionStatus("idle");
+        setActivityLabel("Waiting to connect");
       });
 
       dataChannel.addEventListener("error", () => {
         setConnectionStatus("error");
+        setActivityLabel("Voice session error");
         onError("The OpenAI Realtime voice data channel encountered an error.");
       });
 
@@ -538,6 +554,7 @@ export function useAgentVoiceSession({
       console.error("[agent-voice] Failed to connect voice session.", error);
       disconnect();
       setConnectionStatus("error");
+      setActivityLabel("Voice session error");
       onError(
         error instanceof Error ? error.message : "Could not connect the OpenAI Realtime voice session.",
       );
@@ -546,6 +563,7 @@ export function useAgentVoiceSession({
 
   return {
     connectionStatus,
+    activityLabel,
     liveTranscript,
     connect,
     disconnect,

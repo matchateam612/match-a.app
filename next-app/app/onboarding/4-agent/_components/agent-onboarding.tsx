@@ -68,7 +68,7 @@ export function AgentOnboarding() {
       <AgentLayout
         eyebrow="Section 4"
         title="Agent onboarding"
-        description="Preparing your saved agent conversation scaffold..."
+        description="Preparing your saved agent conversation..."
       >
         <div />
       </AgentLayout>
@@ -125,7 +125,7 @@ function AgentOnboardingClient() {
     persistState,
   });
 
-  const { connectionStatus, liveTranscript, connect, disconnect, queueInitialVoiceTurnContext } = useAgentVoiceSession({
+  const { connectionStatus, activityLabel, liveTranscript, connect, disconnect, queueInitialVoiceTurnContext } = useAgentVoiceSession({
     enabled: draft.selectedMode === "voice" && draft.status !== "complete",
     transcript: draft.transcript,
     criteria: draft.criteria,
@@ -195,7 +195,7 @@ function AgentOnboardingClient() {
       setSaveError("");
       setSaveMessage(
         mode === "voice"
-          ? "Preparing a real first voice prompt from your onboarding answers."
+          ? "Preparing your first voice turn from the answers you already shared."
           : "Preparing the first assistant message from your onboarding answers.",
       );
       setIsPreparingConversation(true);
@@ -476,10 +476,10 @@ function AgentOnboardingClient() {
                 completedAt: new Date().toISOString(),
               }));
               setProgress("complete");
-              setSaveMessage("Scaffold completion saved locally. Replace this button with the real finalize flow later.");
+              setSaveMessage("Conversation progress saved locally.");
             }}
           >
-            Save scaffold state
+            Save progress
           </button>
         </>
       }
@@ -501,6 +501,7 @@ function AgentOnboardingClient() {
         pendingAssistantMessage={pendingAssistantMessage}
         voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
         voiceConnectionStatus={connectionStatus}
+        voiceActivityLabel={activityLabel}
         liveVoiceTranscript={liveTranscript}
         finalSummary={draft.finalSummary}
         onSubmitTextTurn={onSubmitTextTurn}
@@ -543,7 +544,7 @@ function AgentOnboardingClient() {
           style={{ minHeight: 280, fontFamily: "monospace", resize: "vertical" }}
         />
         <p className={styles.helper}>
-          This scaffold keeps criteria flexible and data-driven. You can expand, rename, or replace criteria later without rewriting the core state shape.
+          This criteria model stays flexible and data-driven. You can expand, rename, or replace criteria later without rewriting the core state shape.
         </p>
       </div>
 

@@ -6,6 +6,7 @@ import type { AgentVoiceConnectionStatus } from "../_lib/agent-types";
 type VoiceSessionPanelProps = {
   statusMessage: string;
   connectionStatus: AgentVoiceConnectionStatus;
+  activityLabel: string;
   liveTranscript: string;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -14,6 +15,7 @@ type VoiceSessionPanelProps = {
 export function VoiceSessionPanel({
   statusMessage,
   connectionStatus,
+  activityLabel,
   liveTranscript,
   onConnect,
   onDisconnect,
@@ -47,9 +49,15 @@ export function VoiceSessionPanel({
           </p>
         </div>
         <div style={{ border: "1px dashed rgba(15, 23, 42, 0.18)", borderRadius: 18, padding: 14 }}>
+          <strong>Agent activity</strong>
+          <p style={{ marginTop: 10, marginBottom: 0 }}>
+            {activityLabel}
+          </p>
+        </div>
+        <div style={{ border: "1px dashed rgba(15, 23, 42, 0.18)", borderRadius: 18, padding: 14 }}>
           <strong>Live transcript</strong>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
-            {liveTranscript || "Your current speech turn will appear here while OpenAI Realtime is transcribing it."}
+            {liveTranscript || "Your current speech will appear here while the session is listening."}
           </p>
         </div>
         <div style={{ border: "1px dashed rgba(15, 23, 42, 0.18)", borderRadius: 18, padding: 14 }}>
