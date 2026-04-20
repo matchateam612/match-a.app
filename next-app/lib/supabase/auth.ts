@@ -68,3 +68,49 @@ export async function resendSignupVerificationEmail(email: string) {
 
   return data;
 }
+
+function getBrowserOrigin() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.location.origin;
+}
+
+export async function sendPasswordResetEmail(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  const origin = getBrowserOrigin();
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: origin ? `${origin}/reset-password` : undefined,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateCurrentUserPassword(password: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function exchangeCodeForSession(code: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

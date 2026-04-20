@@ -5,13 +5,24 @@ import styles from "../auth-page.module.scss";
 import { getAuthPageCopy } from "../lib/auth-copy";
 import type { AuthMode } from "../lib/auth-types";
 
+type AuthShellCopy = {
+  topLinkHref: string;
+  topLinkLabel: string;
+  heroEyebrow: string;
+  heroTitlePrefix: string;
+  heroTitleHighlight: string;
+  heroCopy: string;
+  heroBadges: [string, string] | string[];
+};
+
 type AuthShellProps = {
+  copy?: AuthShellCopy;
   mode: AuthMode;
   children: ReactNode;
 };
 
-export function AuthShell({ mode, children }: AuthShellProps) {
-  const copy = getAuthPageCopy(mode);
+export function AuthShell({ mode, children, copy: copyOverride }: AuthShellProps) {
+  const copy = copyOverride ?? getAuthPageCopy(mode);
 
   return (
     <div className={styles.page}>
