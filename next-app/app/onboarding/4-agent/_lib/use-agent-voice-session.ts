@@ -108,6 +108,8 @@ export function useAgentVoiceSession({
   const onStatusChangeRef = useRef(onStatusChange);
   const initialVoiceTurnContextRef = useRef<InitialVoiceTurnContextOptions | null>(null);
   const pendingAssistantTranscriptRef = useRef("");
+  const pendingVoiceAssistantTextRef = useRef<Promise<string | null> | null>(null);
+  const pendingVoiceShouldPersistAssistantRef = useRef(false);
   const pendingVoiceTurnResolutionRef = useRef<Promise<ResolveAgentTurnExtractionResponse> | null>(null);
   const pendingVoiceTurnSnapshotRef = useRef<{
     draftSummary: string;
@@ -191,7 +193,7 @@ export function useAgentVoiceSession({
         type: "response.create",
         response: {
           conversation: "none",
-          output_modalities: ["audio", "text"],
+          output_modalities: ["audio"],
           instructions,
           input: [
             {
@@ -243,6 +245,9 @@ export function useAgentVoiceSession({
     }
 
     initialVoiceTurnContextRef.current = null;
+    pendingVoiceShouldPersistAssistantRef.current = false;
+    pendingVoiceAssistantTextRef.current = null;
+    pendingVoiceTurnResolutionRef.current = null;
     pendingVoiceTurnSnapshotRef.current = {
       draftSummary: payload.draftSummary,
       status: payload.status,
@@ -300,6 +305,7 @@ export function useAgentVoiceSession({
         status: voiceContextPayload.status,
         lastAskedCriterionId: voiceContextPayload.lastAskedCriterionId,
       };
+      pendingVoiceShouldPersistAssistantRef.current = true;
 
       pendingVoiceTurnResolutionRef.current = fetch("/api/agent-turn/extract", {
         method: "POST",
@@ -329,6 +335,37 @@ export function useAgentVoiceSession({
           }
 
           return payload;
+        });
+
+      pendingVoiceAssistantTextRef.current = fetch("/api/agent-turn/voice-transcript", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedMode: "voice",
+          userMessage: normalizedMessage,
+          transcript: requestTranscript,
+          criteriaDefinitions: criteriaDefinitionsRef.current,
+          criteria: criteriaRef.current,
+          interviewerSystemPrompt: promptSettingsRef.current.interviewerSystemPrompt,
+        }),
+      })
+        .then(async (response) => {
+          const payload = (await response.json()) as SubmitAgentTurnResponse | { error?: string };
+
+          if (
+            !response.ok ||
+            !("assistantMessage" in payload && typeof payload.assistantMessage === "string")
+          ) {
+            throw new Error(
+              "error" in payload && payload.error
+                ? payload.error
+                : "Voice assistant transcript failed.",
+            );
+          }
+
+          return payload.assistantMessage;
         });
 
       onStatusChangeRef.current?.(voiceContextPayload.status);
@@ -467,7 +504,15 @@ export function useAgentVoiceSession({
           }
 
           if (serverEvent.type === "response.done") {
-            const assistantMessage = pendingAssistantTranscriptRef.current.trim();
+            const shouldPersistAssistant = pendingVoiceShouldPersistAssistantRef.current;
+            const assistantMessageFromApp = pendingVoiceAssistantTextRef.current
+              ? await pendingVoiceAssistantTextRef.current.catch((error) => {
+                  console.error("[agent-voice] Voice assistant transcript generation failed.", error);
+                  return null;
+                })
+              : null;
+            const assistantMessage =
+              assistantMessageFromApp?.trim() || pendingAssistantTranscriptRef.current.trim();
             const extractionResult = pendingVoiceTurnResolutionRef.current
               ? await pendingVoiceTurnResolutionRef.current.catch((error) => {
                   console.error("[agent-voice] Voice extraction resolution failed.", error);
@@ -478,7 +523,14 @@ export function useAgentVoiceSession({
 
             pendingVoiceTurnResolutionRef.current = null;
             pendingVoiceTurnSnapshotRef.current = null;
+            pendingVoiceAssistantTextRef.current = null;
+            pendingVoiceShouldPersistAssistantRef.current = false;
             pendingAssistantTranscriptRef.current = "";
+
+            if (!shouldPersistAssistant) {
+              setActivityLabel("Listening");
+              return;
+            }
 
             if (!assistantMessage) {
               setActivityLabel("Listening");

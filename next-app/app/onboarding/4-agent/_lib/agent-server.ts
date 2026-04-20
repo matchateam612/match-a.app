@@ -546,6 +546,26 @@ export function createVoiceTurnContext(
   };
 }
 
+export async function createVoiceAssistantTranscript(
+  request: SubmitAgentTurnRequest,
+): Promise<SubmitAgentTurnResponse> {
+  const snapshot = prepareAgentTurnSnapshot(request);
+  const assistantMessage = await runInterviewer({
+    request,
+    updatedCriteria: snapshot.snapshotCriteria,
+    draftSummary: snapshot.draftSummary,
+  });
+
+  return {
+    criteria: snapshot.snapshotCriteria,
+    assistantMessage,
+    draftSummary: snapshot.draftSummary,
+    status: snapshot.status,
+    lastAskedCriterionId: snapshot.lastAskedCriterionId,
+    extractorRawOutput: "",
+  };
+}
+
 export function createInitialVoiceTurnContext(
   request: CreateInitialVoiceTurnContextRequest,
 ): CreateVoiceTurnContextResponse {
