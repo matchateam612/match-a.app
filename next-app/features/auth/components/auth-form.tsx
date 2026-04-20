@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
   getCurrentUser,
-  resendSignupVerificationEmail,
   signInWithEmailPassword,
   signUpWithEmailPassword,
 } from "@/lib/supabase/auth";
@@ -14,13 +13,18 @@ import {
 import styles from "../auth-page.module.scss";
 import { getAuthPageCopy } from "../lib/auth-copy";
 import { getAuthFeedback, getPasswordHint } from "../lib/auth-errors";
-import { AUTH_SUCCESS_MESSAGES, getPostSignInRoute, getPostSignUpRoute } from "../lib/auth-routes";
+import {
+  getCheckEmailRoute,
+  getPostSignInRoute,
+  getPostSignUpRoute,
+} from "../lib/auth-routes";
 import type { AuthMode } from "../lib/auth-types";
 import { AuthMethods } from "./auth-methods";
 import { PasswordField } from "./password-field";
 import { TermsModal } from "./terms-modal";
 
 type AuthFormProps = {
+  initialMessage?: string;
   mode: AuthMode;
 };
 
@@ -38,18 +42,15 @@ const initialState: AuthFormState = {
   agreedToTerms: false,
 };
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const copy = getAuthPageCopy(mode);
   const [formState, setFormState] = useState<AuthFormState>(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState(initialMessage);
   const [infoMessage, setInfoMessage] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   const passwordHint = getPasswordHint(formState.password);
@@ -82,12 +83,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   }, [router]);
 
   useEffect(() => {
-    const message = searchParams.get("message");
-
-    if (message === "password-reset-success") {
-      setSuccessMessage(AUTH_SUCCESS_MESSAGES.passwordResetSuccess);
-    }
-  }, [searchParams]);
+    setSuccessMessage(initialMessage);
+  }, [initialMessage]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,34 +118,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      setPendingVerificationEmail(formState.email);
-      setSuccessMessage(
-        "Account created. Check your inbox to confirm your email before signing in.",
-      );
-      setFormState(initialState);
+      router.push(getCheckEmailRoute(formState.email));
     } catch (error) {
       setErrorMessage(getAuthFeedback(error));
     } finally {
       setIsSubmitting(false);
-    }
-  }
-
-  async function handleResendConfirmation() {
-    if (!pendingVerificationEmail) {
-      return;
-    }
-
-    setIsResendingEmail(true);
-    setErrorMessage("");
-    setInfoMessage("");
-
-    try {
-      await resendSignupVerificationEmail(pendingVerificationEmail);
-      setInfoMessage("Confirmation email sent again. Check your inbox for the latest link.");
-    } catch (error) {
-      setErrorMessage(getAuthFeedback(error));
-    } finally {
-      setIsResendingEmail(false);
     }
   }
 
@@ -284,28 +258,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Link>
         </p>
       </form>
-
-      {mode === "signup" && pendingVerificationEmail ? (
-        <div className={styles.checkEmailPanel}>
-          <div>
-            <p className={styles.label}>Check your email</p>
-            <p className={styles.formCopy}>
-              We sent a confirmation link to {pendingVerificationEmail}. Once you verify the address,
-              you can sign in normally.
-            </p>
-          </div>
-
-          <button
-            className={styles.submitButton}
-            type="button"
-            disabled={isResendingEmail}
-            onClick={handleResendConfirmation}
-          >
-            {isResendingEmail ? "Sending confirmation..." : "Resend confirmation email"}
-          </button>
-        </div>
-      ) : null}
-
       <AuthMethods />
       <TermsModal open={showTermsModal} onClose={() => setShowTermsModal(false)} />
     </>

@@ -114,3 +114,17 @@ export async function exchangeCodeForSession(code: string) {
 
   return data;
 }
+
+export async function setRecoverySession(accessToken: string, refreshToken: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

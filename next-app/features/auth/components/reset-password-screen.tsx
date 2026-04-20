@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { exchangeCodeForSession, updateCurrentUserPassword } from "@/lib/supabase/auth";
+import {
+  exchangeCodeForSession,
+  setRecoverySession,
+  updateCurrentUserPassword,
+} from "@/lib/supabase/auth";
 
 import styles from "../auth-page.module.scss";
 import { getResetPasswordCopy } from "../lib/auth-copy";
@@ -15,9 +19,12 @@ import { PasswordField } from "./password-field";
 
 type RecoveryStatus = "checking" | "ready" | "invalid";
 
-export function ResetPasswordScreen() {
+type ResetPasswordScreenProps = {
+  code?: string;
+};
+
+export function ResetPasswordScreen({ code }: ResetPasswordScreenProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const copy = getResetPasswordCopy();
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +37,35 @@ export function ResetPasswordScreen() {
     let isActive = true;
 
     async function prepareRecoverySession() {
-      const code = searchParams.get("code");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const hashError = hashParams.get("error_description") ?? hashParams.get("error");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hashType = hashParams.get("type");
+
+      if (hashError) {
+        if (isActive) {
+          setRecoveryStatus("invalid");
+          setErrorMessage(decodeURIComponent(hashError));
+        }
+        return;
+      }
+
+      if (hashType === "recovery" && accessToken && refreshToken) {
+        try {
+          await setRecoverySession(accessToken, refreshToken);
+
+          if (isActive) {
+            setRecoveryStatus("ready");
+          }
+        } catch (error) {
+          if (isActive) {
+            setRecoveryStatus("invalid");
+            setErrorMessage(getAuthFeedback(error));
+          }
+        }
+        return;
+      }
 
       if (!code) {
         if (isActive) {
@@ -59,7 +94,7 @@ export function ResetPasswordScreen() {
     return () => {
       isActive = false;
     };
-  }, [searchParams]);
+  }, [code]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
