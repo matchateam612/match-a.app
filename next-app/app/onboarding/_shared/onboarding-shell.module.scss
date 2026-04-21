@@ -73,6 +73,28 @@
   font-weight: 700;
 }
 
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-brand-primary-fixed) 54%, transparent);
+  color: var(--color-brand-primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .main {
   width: 100%;
   max-width: 1080px;
@@ -82,6 +104,73 @@
 
 .layout {
   display: block;
+}
+
+.heroCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 244, 254, 0.16), transparent 32%),
+    linear-gradient(
+      140deg,
+      color-mix(in srgb, var(--color-brand-primary-fixed) 72%, var(--color-surface-primary)),
+      color-mix(in srgb, var(--color-surface-primary) 88%, transparent)
+    );
+  box-shadow: $shadow-soft;
+}
+
+.heroContent {
+  display: grid;
+  gap: 18px;
+  padding: 22px 18px;
+}
+
+.heroTitle {
+  max-width: 12ch;
+  font-family: var(--font-geist-sans);
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.heroHighlight {
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.heroCopy {
+  max-width: 34rem;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.heroBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-surface-primary) 88%, transparent);
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-border-strong) 20%, transparent);
+}
+
+.heroBadgeAccent {
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
 }
 
 .panelCard {
@@ -259,6 +348,65 @@
   background: color-mix(in srgb, var(--color-surface-secondary) 84%, transparent);
 }
 
+.chipGrid,
+.multiGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.chip,
+.multiChip {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-height: 108px;
+  padding: 18px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 18%, transparent);
+  border-radius: 22px 22px 22px 10px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 82%, transparent);
+  color: var(--color-text-primary);
+  text-align: left;
+  transition:
+    transform $transition-base,
+    border-color $transition-base,
+    box-shadow $transition-base,
+    background-color $transition-base;
+}
+
+.chipTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.chipCopy {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.chip:hover:enabled,
+.multiChip:hover:enabled {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-brand-primary) 28%, transparent);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+}
+
+.chipActive,
+.multiChipActive {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  box-shadow: 0 18px 36px rgba(147, 73, 55, 0.16);
+}
+
+.chipActive .chipCopy,
+.multiChipActive .chipCopy {
+  color: rgba(255, 255, 255, 0.86);
+}
+
 .selectionSummary {
   display: inline-flex;
   align-items: center;
@@ -390,6 +538,14 @@
     padding-top: 40px;
   }
 
+  .heroCard {
+    margin-bottom: 20px;
+  }
+
+  .heroContent {
+    padding: 32px 28px;
+  }
+
   .panelCard {
     max-width: 760px;
     min-height: 620px;
@@ -398,6 +554,14 @@
   }
 
   .splitCard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chipGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .multiGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -437,12 +601,41 @@
     border-radius: 22px;
   }
 
+  .heroCard {
+    border-radius: 24px;
+  }
+
   .footerInner {
     align-items: stretch;
   }
 
   .progressMeta {
     flex-direction: column;
+  }
+
+  .heroContent {
+    padding: 20px 18px;
+  }
+
+  .heroTitle {
+    max-width: none;
+    font-size: clamp(1.8rem, 9vw, 2.5rem);
+  }
+
+  .chip,
+  .multiChip {
+    min-height: 92px;
+    padding: 15px 14px;
+    border-radius: 18px 18px 18px 8px;
+  }
+
+  .chipTitle {
+    font-size: 1rem;
+  }
+
+  .chipCopy {
+    font-size: 0.84rem;
+    line-height: 1.4;
   }
 
   .nextButton {
