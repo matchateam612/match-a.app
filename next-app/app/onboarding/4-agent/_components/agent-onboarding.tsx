@@ -509,6 +509,7 @@ function AgentOnboardingClient() {
       });
 
       setSaveMessage("Agent profile saved to user_agent_profile.");
+      router.push("/dashboard");
     } catch (error) {
       setSaveError(
         error instanceof Error && error.message
@@ -516,7 +517,7 @@ function AgentOnboardingClient() {
           : "We couldn't save your agent profile right now.",
       );
     }
-  }, [draft, draftSummary]);
+  }, [draft, draftSummary, router]);
 
   return (
     <AgentLayout

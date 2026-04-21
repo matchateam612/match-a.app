@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import styles from "../../1-basics/page.module.scss";
 import {
@@ -95,6 +96,7 @@ export function MentalityOnboarding() {
 }
 
 function MentalityOnboardingClient() {
+  const router = useRouter();
   const [isHydrating, setIsHydrating] = useState(true);
   const [draft, setDraft] = useState<MentalityDraft>(initialDraft);
   const [progress, setProgress] = useState<MentalityProgress>(initialProgress);
@@ -262,6 +264,7 @@ function MentalityOnboardingClient() {
       });
       setProgress(finalProgress);
       setSaveMessage("Mentality answers saved to user_mentality.");
+      router.push("/onboarding/3-picture");
     } catch (error) {
       setSaveError(
         error instanceof Error && error.message

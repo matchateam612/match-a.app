@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import styles from "../page.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
@@ -95,6 +96,7 @@ export function BasicInfoOnboarding() {
 }
 
 function BasicInfoOnboardingClient() {
+  const router = useRouter();
   const [isHydrating, setIsHydrating] = useState(true);
   const [draft, setDraft] = useState<BasicInfoDraft>(initialDraft);
   const [currentStep, setCurrentStep] = useState(0);
@@ -273,6 +275,7 @@ function BasicInfoOnboardingClient() {
         basicInfo: draft,
       });
       setSaveMessage("Basic info saved to user_basic_info.");
+      router.push("/onboarding/2-mentality");
     } catch (error) {
       setSaveError(
         error instanceof Error && error.message
