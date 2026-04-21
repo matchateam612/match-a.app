@@ -320,6 +320,12 @@
   gap: 24px;
 }
 
+.matchesIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .sectionHeader {
   display: flex;
   align-items: baseline;
@@ -343,6 +349,217 @@
 .rippleGrid {
   display: grid;
   gap: 16px;
+}
+
+.agentLayout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 20px;
+  min-height: calc(100dvh - 220px);
+}
+
+.threadPanel,
+.chatPanel,
+.profileCard {
+  border-radius: 24px;
+  background: var(--color-surface-primary);
+  box-shadow: $shadow-soft;
+}
+
+.threadPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.threadPanelHeader,
+.chatHeader,
+.profileCardHeader,
+.chatComposerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.threadAction,
+.chatSendButton {
+  border: 0;
+  border-radius: $radius-pill;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  font-family: var(--font-geist-sans);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.threadAction {
+  padding: 10px 14px;
+}
+
+.threadList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.threadItem,
+.threadItemActive {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid rgba(147, 73, 55, 0.08);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 72%, transparent);
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.threadItemActive {
+  border-color: rgba(147, 73, 55, 0.2);
+  background:
+    linear-gradient(135deg, rgba(147, 73, 55, 0.12), rgba(77, 202, 211, 0.12)),
+    var(--color-surface-secondary);
+}
+
+.threadTitle,
+.profileCardTitle,
+.chatTitle {
+  font-family: var(--font-geist-sans);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.threadTitle,
+.profileCardTitle {
+  font-size: 1.05rem;
+}
+
+.threadPreview,
+.profileCardDescription,
+.chatHint {
+  color: var(--color-text-tertiary);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.chatPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding: 20px;
+}
+
+.chatTitle {
+  font-size: 2rem;
+}
+
+.chatStatus {
+  padding: 6px 12px;
+  border-radius: $radius-pill;
+  background: rgba(147, 73, 55, 0.1);
+  color: var(--color-brand-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chatTranscript {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 360px;
+  padding: 8px 0;
+}
+
+.chatBubbleAssistant,
+.chatBubbleUser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(680px, 92%);
+  padding: 16px 18px;
+  border-radius: 20px;
+}
+
+.chatBubbleAssistant {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--color-surface-secondary) 90%, transparent);
+}
+
+.chatBubbleUser {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(147, 73, 55, 0.16), rgba(77, 202, 211, 0.16));
+}
+
+.chatRoleLabel,
+.chatComposerLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chatComposer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(147, 73, 55, 0.12);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 80%, transparent);
+}
+
+.chatInput {
+  width: 100%;
+  min-height: 96px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  line-height: 1.6;
+}
+
+.chatSendButton {
+  padding: 12px 18px;
+}
+
+.profileGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.profileCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+}
+
+.profileMetaList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profileMetaPill {
+  padding: 8px 12px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-surface-secondary) 88%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .rippleCard {
@@ -578,6 +795,16 @@
 
   .rippleCard {
     align-items: flex-start;
+  }
+
+  .agentLayout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .chatBubbleAssistant,
+  .chatBubbleUser {
+    max-width: 100%;
   }
 
   .bottomNav {
