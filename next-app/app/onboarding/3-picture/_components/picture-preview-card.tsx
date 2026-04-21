@@ -1,12 +1,16 @@
 import Image from "next/image";
 
 import styles from "../../1-basics/page.module.scss";
+import pictureStyles from "./picture.module.scss";
 import type { PictureDraft } from "./picture-types";
 
 type PicturePreviewCardProps = {
   draft: PictureDraft;
   originalPreviewUrl: string;
   generatedPreviewUrl: string | null;
+  useGeneratedImage: boolean;
+  onChooseOriginal: () => void;
+  onChooseGenerated: () => void;
   onReset: () => void;
 };
 
@@ -14,46 +18,49 @@ export function PicturePreviewCard({
   draft,
   originalPreviewUrl,
   generatedPreviewUrl,
+  useGeneratedImage,
+  onChooseOriginal,
+  onChooseGenerated,
   onReset,
 }: PicturePreviewCardProps) {
   return (
     <div className={styles.stackCard}>
-      <span className={styles.inlineLabel}>Photo preview</span>
+      <span className={styles.inlineLabel}>Choose your final image</span>
       <div className={styles.selectionSummary}>
-        {draft.source === "camera" ? "Captured on camera" : "Uploaded from device"}
+        {useGeneratedImage && generatedPreviewUrl ? "AI version selected" : "Original selected"}
       </div>
-      <div
-        style={{
-          display: "grid",
-          gap: "16px",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gap: "12px",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          }}
-        >
-          <div style={{ display: "grid", gap: "10px" }}>
-            <span className={styles.helper}>Original</span>
+      <div className={pictureStyles.choiceGrid}>
+        <div className={pictureStyles.previewGrid}>
+          <div
+            className={`${pictureStyles.choiceCard} ${
+              !useGeneratedImage || !generatedPreviewUrl ? pictureStyles.choiceCardActive : ""
+            }`.trim()}
+          >
+            <span className={styles.helper}>
+              Original {draft.source === "camera" ? "camera photo" : "uploaded photo"}
+            </span>
             <Image
               src={originalPreviewUrl}
               alt="Original profile upload preview"
               width={Math.max(draft.width, 1)}
               height={Math.max(draft.height, 1)}
               unoptimized
-              style={{
-                width: "100%",
-                height: "auto",
-                borderRadius: "22px",
-                aspectRatio: "3 / 4",
-                objectFit: "cover",
-              }}
+              className={pictureStyles.choiceImage}
             />
+            <button
+              className={`${styles.backButton} ${pictureStyles.choiceButton}`.trim()}
+              type="button"
+              onClick={onChooseOriginal}
+            >
+              Use original
+            </button>
           </div>
           {generatedPreviewUrl ? (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <div
+              className={`${pictureStyles.choiceCard} ${
+                useGeneratedImage ? pictureStyles.choiceCardActive : ""
+              }`.trim()}
+            >
               <span className={styles.helper}>AI result</span>
               <Image
                 src={generatedPreviewUrl}
@@ -61,21 +68,22 @@ export function PicturePreviewCard({
                 width={Math.max(draft.width, 1)}
                 height={Math.max(draft.height, 1)}
                 unoptimized
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  borderRadius: "22px",
-                  aspectRatio: "3 / 4",
-                  objectFit: "cover",
-                }}
+                className={pictureStyles.choiceImage}
               />
+              <button
+                className={`${styles.nextButton} ${pictureStyles.choiceButton}`.trim()}
+                type="button"
+                onClick={onChooseGenerated}
+              >
+                Use AI version
+              </button>
             </div>
           ) : null}
         </div>
         <p className={styles.helper}>
           {generatedPreviewUrl
-            ? "The AI result uses your current image plus your prompt. If no image API key is configured, we keep your original JPEG."
-            : "Your original JPEG preview is ready. You can keep it as-is or run the AI transform first."}
+            ? "Choose the original if the AI result feels too edited. You can still go back and regenerate."
+            : "Your original JPEG is ready. If you want, generate an AI version and compare both before continuing."}
         </p>
         <button className={styles.backButton} type="button" onClick={onReset}>
           Choose a different photo

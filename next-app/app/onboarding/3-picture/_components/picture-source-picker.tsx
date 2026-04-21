@@ -1,4 +1,5 @@
 import styles from "../../1-basics/page.module.scss";
+import pictureStyles from "./picture.module.scss";
 import type { PictureDraft, PictureSource } from "./picture-types";
 
 type PictureSourcePickerProps = {
@@ -17,7 +18,7 @@ export function PictureSourcePicker({
   onCameraClick,
 }: PictureSourcePickerProps) {
   return (
-    <div className={styles.splitCard}>
+    <div className={`${styles.splitCard} ${pictureStyles.pickerCard}`.trim()}>
       <button
         className={`${styles.chip} ${draft.source === "upload" ? styles.chipActive : ""}`.trim()}
         type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -24,6 +25,7 @@ import {
   initialDraft,
   MAX_GALLERY_PHOTOS,
   PICTURE_STEP_STORAGE_KEY,
+  TOTAL_STEPS,
   USER_INFO_STORAGE_KEY,
 } from "./picture-data";
 import { CameraCaptureCard } from "./camera-capture-card";
@@ -36,6 +38,7 @@ import { usePictureDraftFiles } from "./picture-draft-files";
 import { preparePictureFile, transformPictureWithAi } from "./picture-file-utils";
 import { hasPictureDraftContent, isPictureReady, readStoredPictureState } from "./picture-storage";
 import type { GalleryPictureSlot, PictureDraft, PictureSource } from "./picture-types";
+import pictureStyles from "./picture.module.scss";
 
 function createEmptyGallerySlots(): GalleryPictureSlot[] {
   return Array.from({ length: MAX_GALLERY_PHOTOS }, (_, index) => ({
@@ -53,13 +56,25 @@ export function PictureOnboarding() {
   if (!isClientReady) {
     return (
       <PictureLayout
+        currentStep={0}
         draftStatus="Preparing your saved draft..."
+        panelClassName={pictureStyles.panelCard}
+        questionBlockClassName={pictureStyles.questionBlock}
+        footerClassName={pictureStyles.footerCompact}
         footer={
           <>
-            <button className={styles.backButton} type="button" disabled>
+            <button
+              className={`${styles.backButton} ${pictureStyles.compactButton} ${pictureStyles.compactBackButton}`.trim()}
+              type="button"
+              disabled
+            >
               Back
             </button>
-            <button className={styles.nextButton} type="button" disabled>
+            <button
+              className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+              type="button"
+              disabled
+            >
               Finish picture
             </button>
           </>
@@ -85,6 +100,7 @@ function PictureOnboardingClient() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [isTransformingImage, setIsTransformingImage] = useState(false);
+  const [useGeneratedImage, setUseGeneratedImage] = useState(false);
   const [gallerySlots, setGallerySlots] = useState<GalleryPictureSlot[]>(() => createEmptyGallerySlots());
   const [isLoadingGallery, setIsLoadingGallery] = useState(true);
 
@@ -116,6 +132,7 @@ function PictureOnboardingClient() {
     setDraft,
     setProgress: setCurrentStep,
     userInfo,
+    progress,
     draftStatus,
     isSavingSection,
     setIsSavingSection,
@@ -151,6 +168,9 @@ function PictureOnboardingClient() {
     () => isPictureReady(draft) && Boolean(originalFile) && !isTransformingImage && !isHydratingFiles,
     [draft, isHydratingFiles, isTransformingImage, originalFile],
   );
+  const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
+  const canGoToReview = Boolean(originalFile) && !isHydratingFiles;
+  const canAdvanceFromReview = Boolean(originalFile) && !isTransformingImage && !isHydratingFiles;
 
   const stopCamera = useCallback(() => {
     const stream = streamRef.current;
@@ -273,6 +293,7 @@ function PictureOnboardingClient() {
           transformedAt: "",
           hasGeneratedImage: false,
         });
+        setUseGeneratedImage(false);
         setCurrentStep(0);
       } catch (error) {
         setSaveError(
@@ -451,6 +472,7 @@ function PictureOnboardingClient() {
     try {
       const transformed = await transformPictureWithAi(originalFile, draft.prompt);
       await setGeneratedFile(transformed);
+      setUseGeneratedImage(true);
       setDraft((current) => ({
         ...current,
         transformedAt: new Date().toISOString(),
@@ -484,6 +506,7 @@ function PictureOnboardingClient() {
     stopCamera();
     setCaptureSource("");
     void clearFiles();
+    setUseGeneratedImage(false);
     setDraft(initialDraft);
     setCurrentStep(0);
   }, [clearFiles, clearSaveFeedback, setCurrentStep, setDraft, stopCamera]);
@@ -550,7 +573,7 @@ function PictureOnboardingClient() {
         throw new Error("Please sign in before finishing this section.");
       }
 
-      const fileToUpload = generatedFile ?? originalFile;
+      const fileToUpload = useGeneratedImage && generatedFile ? generatedFile : originalFile;
 
       if (!fileToUpload) {
         throw new Error("Please add a photo before finishing this section.");
@@ -577,137 +600,238 @@ function PictureOnboardingClient() {
     setSaveError,
     setSaveMessage,
     userInfo,
+    useGeneratedImage,
     generatedFile,
     originalFile,
   ]);
 
+  useEffect(() => {
+    if (!generatedPreviewUrl) {
+      setUseGeneratedImage(false);
+    }
+  }, [generatedPreviewUrl]);
+
+  useEffect(() => {
+    if (currentStep > 0 && !originalFile && !isHydratingFiles) {
+      setCurrentStep(0);
+    }
+  }, [currentStep, isHydratingFiles, originalFile, setCurrentStep]);
+
+  const goBack = useCallback(() => {
+    if (currentStep === 0) {
+      router.push("/onboarding/2-mentality");
+      return;
+    }
+
+    setCurrentStep(currentStep - 1);
+  }, [currentStep, router, setCurrentStep]);
+
+  const goNext = useCallback(() => {
+    if (currentStep === 0) {
+      if (!canGoToReview) {
+        return;
+      }
+
+      setCurrentStep(1);
+      return;
+    }
+
+    if (currentStep === 1) {
+      if (!canAdvanceFromReview) {
+        return;
+      }
+
+      setCurrentStep(2);
+    }
+  }, [canAdvanceFromReview, canGoToReview, currentStep, setCurrentStep]);
+
   const interactionDisabled = isTransformingImage || isSavingSection || isHydratingFiles;
 
   return (
+    <div className={pictureStyles.mobilePanel}>
       <PictureLayout
-      draftStatus={isHydratingFiles ? "Restoring your saved photo draft..." : draftStatus}
-      status={
-        <OnboardingSectionStatus
-          errorMessage={cameraError || saveError}
-          successMessage={saveMessage}
-          errorClassName={`${styles.statusMessage} ${styles.statusError}`}
-          successClassName={`${styles.statusMessage} ${styles.statusSuccess}`}
-        />
-      }
-      footer={
-        <>
-          <button
-            className={styles.backButton}
-            type="button"
-            onClick={() => router.push("/onboarding/2-mentality")}
-            disabled={interactionDisabled}
-          >
-            Back
-          </button>
-          <button
-            className={styles.nextButton}
-            type="button"
-            onClick={finishPicture}
-            disabled={!canContinue || isSavingSection}
-          >
-            {isSavingSection ? "Saving..." : "Finish picture"}
-          </button>
-        </>
-      }
-    >
-      <PictureHero />
-
-      <div className={styles.fieldStack}>
-        <PictureSourcePicker
-          draft={draft}
-          captureSource={captureSource}
-          disabled={interactionDisabled}
-          onUploadClick={() => {
-            setCaptureSource("upload");
-            fileInputRef.current?.click();
-          }}
-          onCameraClick={openCamera}
-        />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={onFileChange}
-          hidden
-        />
-        <input
-          ref={galleryInputRef}
-          type="file"
-          accept="image/*"
-          onChange={onGalleryFileChange}
-          hidden
-        />
-
-        {isCameraOpen ? (
-          <CameraCaptureCard
-            videoRef={videoRef}
-            onCancel={stopCamera}
-            onCapture={capturePhoto}
+        currentStep={currentStep}
+        draftStatus={isHydratingFiles ? "Restoring your saved photo draft..." : draftStatus}
+        panelClassName={pictureStyles.panelCard}
+        questionBlockClassName={pictureStyles.questionBlock}
+        footerClassName={pictureStyles.footerCompact}
+        status={
+          <OnboardingSectionStatus
+            errorMessage={cameraError || saveError}
+            successMessage={saveMessage}
+            errorClassName={`${styles.statusMessage} ${styles.statusError}`}
+            successClassName={`${styles.statusMessage} ${styles.statusSuccess}`}
           />
-        ) : null}
+        }
+        footer={
+          <>
+            <button
+              className={`${styles.backButton} ${pictureStyles.compactButton} ${pictureStyles.compactBackButton}`.trim()}
+              type="button"
+              onClick={goBack}
+              disabled={interactionDisabled}
+            >
+              {currentStep === 0 ? "Back" : "Previous"}
+            </button>
+            {currentStep < TOTAL_STEPS - 1 ? (
+              <button
+                className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+                type="button"
+                onClick={goNext}
+                disabled={
+                  currentStep === 0
+                    ? !canGoToReview || isSavingSection
+                    : !canAdvanceFromReview || isSavingSection
+                }
+              >
+                {currentStep === 0 ? "Review photo" : "Continue to gallery"}
+              </button>
+            ) : (
+              <button
+                className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+                type="button"
+                onClick={finishPicture}
+                disabled={!canContinue || isSavingSection}
+              >
+                {isSavingSection ? "Saving..." : "Finish picture"}
+              </button>
+            )}
+          </>
+        }
+      >
+        <PictureHero currentStep={currentStep} />
 
-        <div className={styles.stackCard}>
-          <span className={styles.inlineLabel}>AI prompt</span>
-          <textarea
-            className={styles.input}
-            value={draft.prompt}
-            onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                prompt: event.target.value,
-              }))
-            }
-            rows={5}
-            disabled={interactionDisabled}
-            placeholder="Describe how the AI should polish this profile photo."
-            style={{
-              minHeight: "140px",
-              paddingTop: "18px",
-              paddingBottom: "18px",
-              resize: "vertical",
-            }}
+        <div className={`${styles.fieldStack} ${pictureStyles.fieldStack}`.trim()}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={onFileChange}
+            hidden
           />
-          <p className={styles.helper}>
-            This prompt is sent with your current image to the AI image converter. If no API key
-            is configured, the original JPEG is kept.
-          </p>
-          <button
-            className={styles.nextButton}
-            type="button"
-            onClick={runAiTransform}
-            disabled={
-              !originalFile || isTransformingImage || isSavingSection || isHydratingFiles || !draft.prompt.trim()
-            }
-          >
-            {isTransformingImage ? "Generating..." : "Generate AI version"}
-          </button>
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            onChange={onGalleryFileChange}
+            hidden
+          />
+
+          {currentStep === 0 ? (
+            <>
+              <PictureSourcePicker
+                draft={draft}
+                captureSource={captureSource}
+                disabled={interactionDisabled}
+                onUploadClick={() => {
+                  setCaptureSource("upload");
+                  fileInputRef.current?.click();
+                }}
+                onCameraClick={openCamera}
+              />
+
+              {isCameraOpen ? (
+                <CameraCaptureCard
+                  videoRef={videoRef}
+                  onCancel={stopCamera}
+                  onCapture={capturePhoto}
+                />
+              ) : null}
+
+              {originalPreviewUrl ? (
+                <div className={`${styles.stackCard} ${pictureStyles.stackCard}`.trim()}>
+                  <span className={styles.inlineLabel}>Current photo</span>
+                  <div className={styles.selectionSummary}>
+                    {draft.source === "camera" ? "Captured on camera" : "Uploaded from device"}
+                  </div>
+                  <Image
+                    src={originalPreviewUrl}
+                    alt="Current profile photo preview"
+                    width={Math.max(draft.width, 1)}
+                    height={Math.max(draft.height, 1)}
+                    unoptimized
+                    className={pictureStyles.choiceImage}
+                  />
+                  <p className={styles.helper}>
+                    This is the base photo you will review in the next step. If it is not the
+                    right image, choose a different one now.
+                  </p>
+                  <button className={styles.backButton} type="button" onClick={resetPhoto}>
+                    Choose a different photo
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {currentStep === 1 ? (
+            <>
+              <div className={`${styles.stackCard} ${pictureStyles.stackCard}`.trim()}>
+                <span className={styles.inlineLabel}>AI prompt</span>
+                <textarea
+                  className={styles.input}
+                  value={draft.prompt}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      prompt: event.target.value,
+                    }))
+                  }
+                  rows={5}
+                  disabled={interactionDisabled}
+                  placeholder="Describe how the AI should polish this profile photo."
+                  style={{
+                    minHeight: "124px",
+                    paddingTop: "16px",
+                    paddingBottom: "16px",
+                    resize: "vertical",
+                  }}
+                />
+                <p className={styles.helper}>
+                  This prompt is sent with your current image to the AI image converter. If no API
+                  key is configured, the original JPEG is kept.
+                </p>
+                <button
+                  className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+                  type="button"
+                  onClick={runAiTransform}
+                  disabled={
+                    !originalFile ||
+                    isTransformingImage ||
+                    isSavingSection ||
+                    isHydratingFiles ||
+                    !draft.prompt.trim()
+                  }
+                >
+                  {isTransformingImage ? "Generating..." : "Generate AI version"}
+                </button>
+              </div>
+
+              {originalPreviewUrl ? (
+                <PicturePreviewCard
+                  draft={draft}
+                  originalPreviewUrl={originalPreviewUrl}
+                  generatedPreviewUrl={generatedPreviewUrl}
+                  useGeneratedImage={useGeneratedImage}
+                  onChooseOriginal={() => setUseGeneratedImage(false)}
+                  onChooseGenerated={() => setUseGeneratedImage(true)}
+                  onReset={resetPhoto}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <PictureGalleryCard
+              slots={gallerySlots}
+              disabled={isTransformingImage || isSavingSection}
+              isLoading={isLoadingGallery}
+              onUploadClick={openGalleryUpload}
+              onDeleteClick={removeGalleryPhoto}
+            />
+          ) : null}
         </div>
-
-        {originalPreviewUrl ? (
-          <PicturePreviewCard
-            draft={draft}
-            originalPreviewUrl={originalPreviewUrl}
-            generatedPreviewUrl={generatedPreviewUrl}
-            onReset={resetPhoto}
-          />
-        ) : null}
-
-        {originalPreviewUrl ? (
-          <PictureGalleryCard
-            slots={gallerySlots}
-            disabled={isTransformingImage || isSavingSection}
-            isLoading={isLoadingGallery}
-            onUploadClick={openGalleryUpload}
-            onDeleteClick={removeGalleryPhoto}
-          />
-        ) : null}
-      </div>
-    </PictureLayout>
+      </PictureLayout>
+    </div>
   );
 }

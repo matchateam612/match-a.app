@@ -8,10 +8,23 @@ type PictureLayoutProps = {
   children: ReactNode;
   draftStatus: string;
   footer: ReactNode;
+  currentStep: number;
+  footerClassName?: string;
+  panelClassName?: string;
+  questionBlockClassName?: string;
   status?: ReactNode;
 };
 
-export function PictureLayout({ children, draftStatus, footer, status }: PictureLayoutProps) {
+export function PictureLayout({
+  children,
+  currentStep,
+  draftStatus,
+  footer,
+  footerClassName,
+  panelClassName,
+  questionBlockClassName,
+  status,
+}: PictureLayoutProps) {
   return (
     <div className={styles.page}>
       <header className={styles.topBar}>
@@ -27,52 +40,35 @@ export function PictureLayout({ children, draftStatus, footer, status }: Picture
 
       <main className={styles.main}>
         <div className={styles.layout}>
-          <section className={styles.heroCard}>
-            <div className={styles.heroContent}>
-              <span className={styles.eyebrow}>
-                <span className={styles.eyebrowDot} />
-                Section 3 of {TOTAL_SECTIONS}
-              </span>
-
-              <div>
-                <h1 className={styles.heroTitle}>
-                  Lead with a <span className={styles.heroHighlight}>strong first photo</span>.
-                </h1>
-                <p className={styles.heroCopy}>
-                  Add a real photo, review a cleaned-up AI version if you want one, and save the
-                  final JPEG to your profile.
-                </p>
-              </div>
-
-              <div className={styles.heroBadges}>
-                <div className={styles.heroBadge}>Upload or use the front camera</div>
-                <div className={`${styles.heroBadge} ${styles.heroBadgeAccent}`}>
-                  AI transform falls back to your original image
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.panelCard}>
+          <section className={`${styles.panelCard} ${panelClassName ?? ""}`.trim()}>
             <div className={styles.panelHeader}>
               <div className={styles.progressMeta}>
-                <span>Step 1 of {TOTAL_STEPS}</span>
+                <span>Step {currentStep + 1} of {TOTAL_STEPS}</span>
                 <span>{draftStatus}</span>
               </div>
 
               <div className={styles.progressTrack} aria-hidden="true">
-                <div className={`${styles.progressSegment} ${styles.progressSegmentActive}`.trim()} />
+                {Array.from({ length: TOTAL_STEPS }, (_, index) => (
+                  <div
+                    key={index}
+                    className={`${styles.progressSegment} ${
+                      index <= currentStep ? styles.progressSegmentActive : ""
+                    }`.trim()}
+                  />
+                ))}
               </div>
             </div>
 
-            <div className={styles.questionBlock}>{children}</div>
+            <div className={`${styles.questionBlock} ${questionBlockClassName ?? ""}`.trim()}>
+              {children}
+            </div>
             {status}
           </section>
         </div>
       </main>
 
       <footer className={styles.footer}>
-        <div className={styles.footerInner}>{footer}</div>
+        <div className={`${styles.footerInner} ${footerClassName ?? ""}`.trim()}>{footer}</div>
       </footer>
     </div>
   );
