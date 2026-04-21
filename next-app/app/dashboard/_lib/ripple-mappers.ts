@@ -14,12 +14,14 @@ function toStatusLabel(match: MatchRecord) {
   return null;
 }
 
-export function mapMatchesToRippleCards(matches: MatchRecord[]): RippleCard[] {
+export function mapMatchesToRippleCards(matches: MatchRecord[], currentUserId: string): RippleCard[] {
   return matches.map((match) => ({
     id: match.id,
     label: "Potential Ripple",
     match_reason: match.match_reason,
     statusLabel: toStatusLabel(match),
+    profilePictureUrl: null,
+    targetUserId: match.user1 === currentUserId ? match.user2 : match.user1,
     userIds: [match.user1, match.user2],
   }));
 }

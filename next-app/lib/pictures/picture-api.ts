@@ -3,6 +3,13 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { UserGalleryPhoto } from "@/lib/supabase/user-picture";
 
+export type MatchedProfilePicture = {
+  matchId: string;
+  path: string | null;
+  signedUrl: string | null;
+  targetUserId: string | null;
+};
+
 async function buildAuthHeaders() {
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase.auth.getSession();
@@ -93,4 +100,19 @@ export async function deleteGalleryPictureRequest(slot: number) {
   });
 
   return parseJsonResponse<{ success: true; slot: number }>(response);
+}
+
+export async function listMatchedProfilePicturesRequest(matchIds: string[]) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch("/api/matches/profile-pictures", {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ matchIds }),
+    cache: "no-store",
+  });
+
+  return parseJsonResponse<{ pictures: MatchedProfilePicture[] }>(response);
 }

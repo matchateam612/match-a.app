@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react";
 
+import { listMatchedProfilePicturesRequest } from "@/lib/pictures/picture-api";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { listMatchesForUser } from "@/lib/supabase/matches";
-import type { MatchRecord } from "@/lib/supabase/types";
 
 import { mapMatchesToRippleCards } from "../_lib/ripple-mappers";
+import type { RippleCard } from "../_lib/ripple-types";
 import { PotentialRipplesSection } from "./potential-ripples-section";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 export function PotentialRipplesContainer() {
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [ripples, setRipples] = useState<RippleCard[]>([]);
   const [state, setState] = useState<LoadState>("idle");
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export function PotentialRipplesContainer() {
 
         if (!user) {
           if (isMounted) {
-            setMatches([]);
+            setRipples([]);
             setState("ready");
           }
 
@@ -34,14 +35,26 @@ export function PotentialRipplesContainer() {
         }
 
         const nextMatches = await listMatchesForUser(user.id);
+        const nextRipples = mapMatchesToRippleCards(nextMatches, user.id);
+        const picturesResponse =
+          nextMatches.length > 0
+            ? await listMatchedProfilePicturesRequest(nextMatches.map((match) => match.id))
+            : { pictures: [] };
+        const picturesByMatchId = new Map(
+          picturesResponse.pictures.map((picture) => [picture.matchId, picture.signedUrl]),
+        );
+        const ripplesWithPictures = nextRipples.map((ripple) => ({
+          ...ripple,
+          profilePictureUrl: picturesByMatchId.get(ripple.id) ?? null,
+        }));
 
         if (isMounted) {
-          setMatches(nextMatches);
+          setRipples(ripplesWithPictures);
           setState("ready");
         }
       } catch {
         if (isMounted) {
-          setMatches([]);
+          setRipples([]);
           setState("error");
         }
       }
@@ -57,7 +70,7 @@ export function PotentialRipplesContainer() {
   return (
     <PotentialRipplesSection
       isLoading={state === "loading" || state === "idle"}
-      ripples={mapMatchesToRippleCards(matches)}
+      ripples={ripples}
     />
   );
 }

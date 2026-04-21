@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { RippleCard } from "../_lib/ripple-types";
 import styles from "../page.module.scss";
 
@@ -24,7 +26,20 @@ export function PotentialRipplesSection({
           ripples.map((ripple) => (
             <article className={styles.rippleCard} key={ripple.id}>
               <div className={styles.rippleGlow} />
-              <div className={styles.rippleAvatar} />
+              <div className={styles.rippleAvatar}>
+                {ripple.profilePictureUrl ? (
+                  <Image
+                    src={ripple.profilePictureUrl}
+                    alt={`${ripple.label} profile picture`}
+                    fill
+                    unoptimized
+                    sizes="80px"
+                    style={{ objectFit: "cover" }}
+                  />
+                ) : (
+                  <div aria-hidden="true" className={styles.rippleAvatarFallback} />
+                )}
+              </div>
               <div className={styles.rippleBody}>
                 <div className={styles.rippleHeader}>
                   <h4 className={styles.rippleTitle}>{ripple.label}</h4>

@@ -598,6 +598,14 @@
     linear-gradient(135deg, var(--color-brand-primary-fixed), var(--color-brand-tertiary-soft));
 }
 
+.rippleAvatarFallback {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.92) 0 18%, transparent 19%),
+    radial-gradient(circle at 50% 105%, rgba(255, 255, 255, 0.82) 0 36%, transparent 37%);
+}
+
 .rippleBody {
   position: relative;
   z-index: 1;
