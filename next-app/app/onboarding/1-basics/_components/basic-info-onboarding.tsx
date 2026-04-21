@@ -214,11 +214,11 @@ function BasicInfoOnboardingClient() {
   );
 
   const {
+    storedState,
     draft,
     setDraft,
     progress: currentStep,
     setProgress: setCurrentStep,
-    isAgeLocked,
     userInfo,
     draftStatus,
     isSavingSection,
@@ -237,6 +237,7 @@ function BasicInfoOnboardingClient() {
     setSaveError,
     setSaveMessage,
   });
+  const isAgeLocked = storedState.isAgeLocked || (draft.age.trim().length > 0 && Number(draft.age) < 18);
 
   const canContinue = isStepComplete(currentStep, draft);
   const isLastStep = currentStep === TOTAL_STEPS - 1;
