@@ -553,13 +553,13 @@ function AgentOnboardingClient() {
         </>
       }
     >
-      <div className={styles.stackCard}>
+      {/* <div className={styles.stackCard}>
         <span className={styles.inlineLabel}>Active interviewer prompt</span>
         <p style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{promptSettings.interviewerSystemPrompt}</p>
         <p className={styles.helper}>
           Edit this in the testing system-prompt page. The real interviewer model should read from this same stored prompt setting.
         </p>
-      </div>
+      </div> */}
 
       <ModePicker selectedMode={draft.selectedMode} onSelectMode={onSelectMode} />
 
