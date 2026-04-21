@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";

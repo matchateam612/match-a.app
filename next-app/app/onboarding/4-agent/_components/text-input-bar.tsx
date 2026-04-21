@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 
 type TextInputBarProps = {
   disabled?: boolean;

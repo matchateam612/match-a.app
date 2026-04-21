@@ -1,4 +1,4 @@
-import styles from "../../page.module.scss";
+import styles from "../../../_shared/onboarding-shell.module.scss";
 
 type AgePreferenceStepProps = {
   preferredAgeMin: string;

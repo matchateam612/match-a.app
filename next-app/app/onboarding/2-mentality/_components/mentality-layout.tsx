@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 import { TOTAL_SECTIONS } from "./mentality-data";
 
 type MentalityLayoutProps = {

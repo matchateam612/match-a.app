@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { DEFAULT_INTERVIEWER_SYSTEM_PROMPT } from "../_lib/agent-prompts";
 import { readAgentPromptSettings, writeAgentPromptSettings } from "../_lib/agent-storage";

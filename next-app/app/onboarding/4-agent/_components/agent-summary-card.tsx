@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 import { summarizeCompletion } from "../_lib/agent-completion";
 import type { AgentCriterionState } from "../_lib/agent-types";
 

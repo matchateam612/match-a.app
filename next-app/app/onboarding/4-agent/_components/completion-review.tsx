@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "../../1-basics/page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 
 type CompletionReviewProps = {
   draftSummary: string;

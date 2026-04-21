@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import styles from "../page.module.scss";
+import styles from "../../_shared/onboarding-shell.module.scss";
 import { TOTAL_SECTIONS, TOTAL_STEPS } from "./basic-info-data";
 
 type BasicInfoLayoutProps = {

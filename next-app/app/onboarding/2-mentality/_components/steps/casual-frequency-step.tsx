@@ -1,4 +1,4 @@
-import styles from "../../../1-basics/page.module.scss";
+import styles from "../../../_shared/onboarding-shell.module.scss";
 import { casualFrequencyOptions } from "../mentality-data";
 import type { CasualFrequencyOption } from "../mentality-types";
 

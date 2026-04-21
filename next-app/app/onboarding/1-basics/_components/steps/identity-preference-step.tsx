@@ -1,4 +1,4 @@
-import styles from "../../page.module.scss";
+import styles from "../../../_shared/onboarding-shell.module.scss";
 import { genderIdentityOptions, interestedInOptions } from "../basic-info-data";
 import type { GenderIdentityOption, InterestedInOption } from "../basic-info-types";
 
