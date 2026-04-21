@@ -62,6 +62,15 @@ type StreamedAgentTurnEvent =
       message: string;
     };
 
+const MAX_AGENT_TURNS = 20;
+
+function applyTurnLimitStatus(
+  turnCount: number,
+  status: AgentOnboardingState["status"],
+) {
+  return turnCount >= MAX_AGENT_TURNS ? "confirming" : status;
+}
+
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
 
@@ -181,6 +190,8 @@ function AgentOnboardingClient() {
       }));
     },
     onAssistantTurn: (payload) => {
+      const nextStatus = applyTurnLimitStatus(draft.turnCount, payload.status);
+
       setDraft((current) => ({
         ...current,
         criteria: payload.criteria,
@@ -190,15 +201,16 @@ function AgentOnboardingClient() {
             role: "assistant",
             modality: "voice",
             text: payload.assistantMessage,
-          }),
+            }),
         ],
-        status: payload.status,
+        status: nextStatus,
         finalSummary: payload.draftSummary,
         lastAskedCriterionId: payload.lastAskedCriterionId,
       }));
+      setProgress(nextStatus);
     },
     onStatusChange: (status) => {
-      setProgress(status);
+      setProgress(applyTurnLimitStatus(draft.turnCount, status));
     },
     onError: (message) => {
       setSaveError(message);
@@ -257,10 +269,15 @@ function AgentOnboardingClient() {
 
         if (nextDraft.transcript.length > 0) {
           setDraft(nextDraft);
-          setProgress(nextDraft.status);
-          if (mode === "voice") {
-            queueInitialVoiceTurnContext(buildInitialVoiceTurnContext(nextDraft));
-          }
+          setProgress(applyTurnLimitStatus(nextDraft.turnCount, nextDraft.status));
+          return;
+        }
+
+        if (mode === "voice") {
+          setDraft(nextDraft);
+          setProgress(applyTurnLimitStatus(nextDraft.turnCount, nextDraft.status));
+          queueInitialVoiceTurnContext(buildInitialVoiceTurnContext(nextDraft));
+          setSaveMessage("Voice mode selected. Connect to hear the first assistant turn spoken live.");
           return;
         }
 
@@ -300,24 +317,12 @@ function AgentOnboardingClient() {
         setDraft({
           ...nextDraft,
           transcript: [initialTranscriptItem],
-          status: payload.status,
+          status: applyTurnLimitStatus(nextDraft.turnCount, payload.status),
           finalSummary: payload.draftSummary,
           lastAskedCriterionId: payload.lastAskedCriterionId,
         });
-        setProgress(payload.status);
-
-        if (mode === "voice") {
-          queueInitialVoiceTurnContext(buildInitialVoiceTurnContext({
-            ...nextDraft,
-            transcript: [initialTranscriptItem],
-            status: payload.status,
-            finalSummary: payload.draftSummary,
-            lastAskedCriterionId: payload.lastAskedCriterionId,
-          }));
-          setSaveMessage("Voice mode selected. The first assistant turn is now prepared from your stored onboarding context and will be generated through the voice session after connect.");
-        } else {
-          setSaveMessage("Text mode selected. The first assistant message is now generated from your stored onboarding context.");
-        }
+        setProgress(applyTurnLimitStatus(nextDraft.turnCount, payload.status));
+        setSaveMessage("Text mode selected. The first assistant message is now generated from your stored onboarding context.");
       } catch (error) {
         setSaveMessage("");
         setSaveError(
@@ -360,10 +365,11 @@ function AgentOnboardingClient() {
       });
 
       const requestTranscript = [...draft.transcript, userTranscriptItem];
+      const nextTurnCount = draft.turnCount + 1;
 
       setDraft((current) => ({
         ...current,
-        turnCount: current.turnCount + 1,
+        turnCount: nextTurnCount,
         transcript: requestTranscript,
       }));
 
@@ -448,13 +454,17 @@ function AgentOnboardingClient() {
               text: completedPayload.assistantMessage,
             }),
           ],
-          status: completedPayload.status,
+          status: applyTurnLimitStatus(nextTurnCount, completedPayload.status),
           finalSummary: completedPayload.draftSummary,
           lastAskedCriterionId: completedPayload.lastAskedCriterionId,
         }));
 
-        setProgress(completedPayload.status);
-        setSaveMessage("Agent turn streamed successfully. The interviewer reply now appears progressively in text mode.");
+        setProgress(applyTurnLimitStatus(nextTurnCount, completedPayload.status));
+        setSaveMessage(
+          nextTurnCount >= MAX_AGENT_TURNS
+            ? "Reached the 20-turn cap. The conversation has been moved to summary confirmation."
+            : "Agent turn streamed successfully. The interviewer reply now appears progressively in text mode.",
+        );
       } catch (error) {
         setPendingAssistantMessage("");
         setSaveError(
@@ -468,6 +478,7 @@ function AgentOnboardingClient() {
       criteriaDefinitions,
       draft.criteria,
       draft.selectedMode,
+      draft.turnCount,
       draft.transcript,
       isSubmittingTurn,
       promptSettings.interviewerSystemPrompt,
@@ -479,6 +490,7 @@ function AgentOnboardingClient() {
   );
 
   const draftSummary = buildDraftSummary(draft.criteria);
+  const turnLimitReached = draft.turnCount >= MAX_AGENT_TURNS;
   const criteriaJson = JSON.stringify(draft.criteria, null, 2);
 
   const saveAgentProfile = useCallback(async () => {
@@ -553,14 +565,6 @@ function AgentOnboardingClient() {
         </>
       }
     >
-      <div className={styles.stackCard}>
-        <span className={styles.inlineLabel}>Active interviewer prompt</span>
-        <p style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{promptSettings.interviewerSystemPrompt}</p>
-        <p className={styles.helper}>
-          Edit this in the testing system-prompt page. The real interviewer model should read from this same stored prompt setting.
-        </p>
-      </div>
-
       <ModePicker selectedMode={draft.selectedMode} onSelectMode={onSelectMode} />
 
       <ChatPanel
@@ -574,7 +578,7 @@ function AgentOnboardingClient() {
         liveVoiceTranscript={liveTranscript}
         finalSummary={draft.finalSummary}
         onSubmitTextTurn={onSubmitTextTurn}
-        isSubmittingTurn={isSubmittingTurn || isPreparingConversation}
+        isSubmittingTurn={isSubmittingTurn || isPreparingConversation || turnLimitReached}
         onConnectVoice={connect}
         onDisconnectVoice={disconnect}
         onConfirmConversation={() => {
@@ -621,6 +625,11 @@ function AgentOnboardingClient() {
         <span className={styles.inlineLabel}>Conversation progress</span>
         <p style={{ marginTop: 0, marginBottom: 8 }}>Session status: {progress}</p>
         <p style={{ marginTop: 0, marginBottom: 0 }}>Turns so far: {draft.turnCount}</p>
+        {turnLimitReached ? (
+          <p className={styles.helper} style={{ marginTop: 8, marginBottom: 0 }}>
+            The 20-turn limit has been reached, so the flow is now using the current summary for confirmation.
+          </p>
+        ) : null}
       </div>
     </AgentLayout>
   );

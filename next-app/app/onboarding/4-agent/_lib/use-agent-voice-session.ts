@@ -193,7 +193,7 @@ export function useAgentVoiceSession({
         type: "response.create",
         response: {
           conversation: "none",
-          output_modalities: ["audio"],
+          output_modalities: ["audio", "text"],
           instructions,
           input: [
             {
@@ -245,7 +245,7 @@ export function useAgentVoiceSession({
     }
 
     initialVoiceTurnContextRef.current = null;
-    pendingVoiceShouldPersistAssistantRef.current = false;
+    pendingVoiceShouldPersistAssistantRef.current = true;
     pendingVoiceAssistantTextRef.current = null;
     pendingVoiceTurnResolutionRef.current = null;
     pendingVoiceTurnSnapshotRef.current = {
