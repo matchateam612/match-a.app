@@ -6,15 +6,11 @@ import { useRouter } from "next/navigation";
 
 import styles from "../../1-basics/page.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
-import {
-  writeStoredProgressValue,
-  writeStoredUserInfo,
-} from "@/app/onboarding/_shared/onboarding-persistence";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
-import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
-import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
+import { getUserPfpPath } from "@/lib/supabase/user-picture";
 import {
   deleteGalleryPictureRequest,
   listGalleryPicturesRequest,
@@ -24,10 +20,14 @@ import {
 import {
   initialDraft,
   MAX_GALLERY_PHOTOS,
-  PICTURE_STEP_STORAGE_KEY,
   TOTAL_STEPS,
-  USER_INFO_STORAGE_KEY,
 } from "./picture-data";
+import {
+  hasPictureDraftContent,
+  isPictureReady,
+  persistPictureStateToIdb,
+  readStoredPictureStateFromIdb,
+} from "./picture-idb";
 import { CameraCaptureCard } from "./camera-capture-card";
 import { PictureGalleryCard } from "./picture-gallery-card";
 import { PictureHero } from "./picture-hero";
@@ -36,7 +36,6 @@ import { PicturePreviewCard } from "./picture-preview-card";
 import { PictureSourcePicker } from "./picture-source-picker";
 import { usePictureDraftFiles } from "./picture-draft-files";
 import { preparePictureFile, transformPictureWithAi } from "./picture-file-utils";
-import { hasPictureDraftContent, isPictureReady, readStoredPictureState } from "./picture-storage";
 import type { GalleryPictureSlot, PictureDraft, PictureSource } from "./picture-types";
 import pictureStyles from "./picture.module.scss";
 
@@ -103,49 +102,13 @@ function PictureOnboardingClient() {
   const [useGeneratedImage, setUseGeneratedImage] = useState(false);
   const [gallerySlots, setGallerySlots] = useState<GalleryPictureSlot[]>(() => createEmptyGallerySlots());
   const [isLoadingGallery, setIsLoadingGallery] = useState(true);
-
-  const buildUserInfo = useCallback(
-    ({
-      draft,
-      storedUserInfo,
-    }: {
-      draft: PictureDraft;
-      progress: number;
-      storedUserInfo: UserInfo;
-    }) => ({
-      ...storedUserInfo,
-      picture: draft,
-    }),
-    [],
-  );
-
-  const persistState = useCallback(
-    ({ progress, userInfo }: { draft: PictureDraft; progress: number; userInfo: UserInfo }) => {
-      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
-      writeStoredProgressValue(PICTURE_STEP_STORAGE_KEY, String(progress));
-    },
-    [],
-  );
-
-  const {
-    draft,
-    setDraft,
-    setProgress: setCurrentStep,
-    userInfo,
-    progress,
-    draftStatus,
-    isSavingSection,
-    setIsSavingSection,
-    saveMessage,
-    setSaveMessage,
-    saveError,
-    setSaveError,
-  } = useOnboardingSectionState({
-    readStoredState: readStoredPictureState,
-    hasDraftContent: hasPictureDraftContent,
-    buildUserInfo,
-    persistState,
-  });
+  const [isHydratingMeta, setIsHydratingMeta] = useState(true);
+  const [draft, setDraft] = useState<PictureDraft>(initialDraft);
+  const [progress, setCurrentStep] = useState(0);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const { clearSaveFeedback } = useSectionSaveFeedback({
     setSaveError,
@@ -164,13 +127,78 @@ function PictureOnboardingClient() {
     enabled: true,
   });
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    void readStoredPictureStateFromIdb()
+      .then((storedState) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setDraft(storedState.draft);
+        setCurrentStep(storedState.progress);
+        setHasSavedDraft(storedState.hasSavedDraft);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setSaveError("We couldn't restore your saved picture draft.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsHydratingMeta(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [setSaveError]);
+
+  useEffect(() => {
+    if (isHydratingMeta) {
+      return;
+    }
+
+    const selectedVariant =
+      useGeneratedImage && draft.hasGeneratedImage ? "aiTransformed" : "original";
+    const nextHasSavedDraft = hasPictureDraftContent(draft);
+
+    setHasSavedDraft(nextHasSavedDraft);
+
+    void persistPictureStateToIdb({
+      draft,
+      progress,
+      selectedVariant,
+    }).catch(() => {
+      setSaveError("We couldn't save your picture draft on this device.");
+    });
+  }, [draft, isHydratingMeta, progress, setSaveError, useGeneratedImage]);
+
+  const draftStatus = useMemo(() => {
+    if (isHydratingMeta) {
+      return "Preparing your saved picture draft...";
+    }
+
+    return hasSavedDraft
+      ? "Saved locally in IndexedDB on this device as you go."
+      : "Your picture draft will be saved locally in IndexedDB on this device.";
+  }, [hasSavedDraft, isHydratingMeta]);
+
   const canContinue = useMemo(
-    () => isPictureReady(draft) && Boolean(originalFile) && !isTransformingImage && !isHydratingFiles,
-    [draft, isHydratingFiles, isTransformingImage, originalFile],
+    () =>
+      isPictureReady(draft) &&
+      Boolean(originalFile) &&
+      !isTransformingImage &&
+      !isHydratingFiles &&
+      !isHydratingMeta,
+    [draft, isHydratingFiles, isHydratingMeta, isTransformingImage, originalFile],
   );
   const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
-  const canGoToReview = Boolean(originalFile) && !isHydratingFiles;
-  const canAdvanceFromReview = Boolean(originalFile) && !isTransformingImage && !isHydratingFiles;
+  const canGoToReview = Boolean(originalFile) && !isHydratingFiles && !isHydratingMeta;
+  const canAdvanceFromReview =
+    Boolean(originalFile) && !isTransformingImage && !isHydratingFiles && !isHydratingMeta;
 
   const stopCamera = useCallback(() => {
     const stream = streamRef.current;
@@ -580,7 +608,10 @@ function PictureOnboardingClient() {
       }
 
       await uploadProfilePictureRequest(fileToUpload);
-      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
+      await upsertUserMatchesInfo({
+        userId: user.id,
+        profilePicturePath: getUserPfpPath(user.id),
+      });
       setSaveMessage("Picture saved. Your profile image is ready.");
       router.push("/onboarding");
     } catch (error) {
@@ -599,7 +630,6 @@ function PictureOnboardingClient() {
     setIsSavingSection,
     setSaveError,
     setSaveMessage,
-    userInfo,
     useGeneratedImage,
     generatedFile,
     originalFile,
@@ -645,13 +675,18 @@ function PictureOnboardingClient() {
     }
   }, [canAdvanceFromReview, canGoToReview, currentStep, setCurrentStep]);
 
-  const interactionDisabled = isTransformingImage || isSavingSection || isHydratingFiles;
+  const interactionDisabled =
+    isTransformingImage || isSavingSection || isHydratingFiles || isHydratingMeta;
 
   return (
     <div className={pictureStyles.mobilePanel}>
-      <PictureLayout
+        <PictureLayout
         currentStep={currentStep}
-        draftStatus={isHydratingFiles ? "Restoring your saved photo draft..." : draftStatus}
+        draftStatus={
+          isHydratingFiles
+            ? "Restoring your saved photo draft..."
+            : draftStatus
+        }
         panelClassName={pictureStyles.panelCard}
         questionBlockClassName={pictureStyles.questionBlock}
         footerClassName={pictureStyles.footerCompact}

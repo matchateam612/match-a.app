@@ -1,121 +1,29 @@
 "use client";
 
-import { useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import styles from "../page.module.scss";
-import {
-  removeLocalStorageItem,
-  readLocalStorageItem,
-  useClientReady,
-  writeLocalStorageItem,
-} from "@/app/onboarding/_shared/onboarding-storage";
-import {
-  readStoredProgressValue,
-  readStoredUserInfo,
-  writeStoredProgressValue,
-  writeStoredUserInfo,
-} from "@/app/onboarding/_shared/onboarding-persistence";
+import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
-import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
-import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { upsertUserPrivateInfo } from "@/lib/supabase/user-private-info";
+import { upsertUserBasicInfo } from "@/lib/supabase/user-basic-info";
+import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import { BasicInfoLayout } from "./basic-info-layout";
 import {
-  BASIC_INFO_LOCK_STORAGE_KEY,
-  BASIC_INFO_STEP_STORAGE_KEY,
   initialDraft,
   TOTAL_STEPS,
-  USER_INFO_STORAGE_KEY,
 } from "./basic-info-data";
+import {
+  markBasicInfoAgeLockedInIdb,
+  persistBasicInfoStateToIdb,
+  readStoredBasicInfoStateFromIdb,
+} from "./basic-info-idb";
 import type { BasicInfoDraft, PreferredEthnicityOption } from "./basic-info-types";
 import { AgePreferenceStep } from "./steps/age-preference-step";
 import { AgeStep } from "./steps/age-step";
 import { EthnicityStep } from "./steps/ethnicity-step";
 import { IdentityPreferenceStep } from "./steps/identity-preference-step";
-
-type StoredBasicInfoState = {
-  progress: number;
-  draft: BasicInfoDraft;
-  hasSavedDraft: boolean;
-  isAgeLocked: boolean;
-  userInfo: UserInfo;
-};
-
-const emptyStoredState: StoredBasicInfoState = {
-  progress: 0,
-  draft: initialDraft,
-  hasSavedDraft: false,
-  isAgeLocked: false,
-  userInfo: {},
-};
-
-function isValidStep(step: number) {
-  return step >= 0 && step < TOTAL_STEPS;
-}
-
-function readStoredState(): StoredBasicInfoState {
-  if (typeof window === "undefined") {
-    return emptyStoredState;
-  }
-
-  const rawCurrentStep = readStoredProgressValue(BASIC_INFO_STEP_STORAGE_KEY);
-  const ageLock = readLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY) === "true";
-  const legacyBasicInfo = readLocalStorageItem("matcha.onboarding.basic-info");
-  let userInfo: UserInfo = readStoredUserInfo(USER_INFO_STORAGE_KEY);
-
-  if (!userInfo.basic_info && legacyBasicInfo) {
-    try {
-      const parsedLegacy = JSON.parse(legacyBasicInfo) as Partial<BasicInfoDraft> & {
-        currentStep?: number;
-      };
-
-      userInfo = {
-        ...userInfo,
-        basic_info: {
-          ...initialDraft,
-          ...parsedLegacy,
-          preferredAgeMin: parsedLegacy.preferredAgeMin ?? initialDraft.preferredAgeMin,
-          preferredAgeMax: parsedLegacy.preferredAgeMax ?? initialDraft.preferredAgeMax,
-          preferredEthnicities: Array.isArray(parsedLegacy.preferredEthnicities)
-            ? parsedLegacy.preferredEthnicities
-            : initialDraft.preferredEthnicities,
-        },
-      };
-
-      if (typeof parsedLegacy.currentStep === "number" && !rawCurrentStep) {
-        writeStoredProgressValue(BASIC_INFO_STEP_STORAGE_KEY, String(parsedLegacy.currentStep));
-      }
-
-      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
-      removeLocalStorageItem("matcha.onboarding.basic-info");
-    } catch {
-      removeLocalStorageItem("matcha.onboarding.basic-info");
-    }
-  }
-
-  const draft = {
-    ...initialDraft,
-    ...userInfo.basic_info,
-    phoneNumber: userInfo.basic_info?.phoneNumber ?? initialDraft.phoneNumber,
-    preferredAgeMin: userInfo.basic_info?.preferredAgeMin ?? initialDraft.preferredAgeMin,
-    preferredAgeMax: userInfo.basic_info?.preferredAgeMax ?? initialDraft.preferredAgeMax,
-    preferredEthnicities: Array.isArray(userInfo.basic_info?.preferredEthnicities)
-      ? userInfo.basic_info.preferredEthnicities
-      : initialDraft.preferredEthnicities,
-  };
-
-  const parsedCurrentStep = rawCurrentStep ? Number(rawCurrentStep) : 0;
-
-  return {
-    progress: isValidStep(parsedCurrentStep) ? parsedCurrentStep : 0,
-    draft,
-    hasSavedDraft: Boolean(userInfo.basic_info),
-    isAgeLocked: ageLock,
-    userInfo,
-  };
-}
 
 function isStepComplete(step: number, draft: BasicInfoDraft) {
   switch (step) {
@@ -187,54 +95,77 @@ export function BasicInfoOnboarding() {
 }
 
 function BasicInfoOnboardingClient() {
-  const buildUserInfo = useCallback(
-    ({
-      draft,
-      storedUserInfo,
-    }: {
-      draft: BasicInfoDraft;
-      progress: number;
-      storedUserInfo: UserInfo;
-    }) => ({
-      ...storedUserInfo,
-      basic_info: draft,
-    }),
-    [],
-  );
-
-  const persistState = useCallback(
-    ({ progress, userInfo }: { draft: BasicInfoDraft; progress: number; userInfo: UserInfo }) => {
-      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
-      writeStoredProgressValue(BASIC_INFO_STEP_STORAGE_KEY, String(progress));
-    },
-    [],
-  );
-
-  const {
-    draft,
-    setDraft,
-    progress: currentStep,
-    setProgress: setCurrentStep,
-    userInfo,
-    draftStatus,
-    isSavingSection,
-    setIsSavingSection,
-    saveMessage,
-    setSaveMessage,
-    saveError,
-    setSaveError,
-  } = useOnboardingSectionState({
-    readStoredState,
-    hasDraftContent,
-    buildUserInfo,
-    persistState,
-  });
+  const [isHydrating, setIsHydrating] = useState(true);
+  const [draft, setDraft] = useState<BasicInfoDraft>(initialDraft);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isAgeLocked, setIsAgeLocked] = useState(false);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const { clearSaveFeedback } = useSectionSaveFeedback({
     setSaveError,
     setSaveMessage,
   });
-  const isAgeLocked =
-    readLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY) === "true";
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void readStoredBasicInfoStateFromIdb()
+      .then((storedState) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setDraft(storedState.draft);
+        setCurrentStep(storedState.progress);
+        setIsAgeLocked(storedState.isAgeLocked);
+        setHasSavedDraft(storedState.hasSavedDraft);
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setSaveError("We couldn't restore your saved basic info draft.");
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsHydrating(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [setSaveError]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    const nextHasSavedDraft = hasDraftContent(draft, currentStep);
+    setHasSavedDraft(nextHasSavedDraft);
+
+    void persistBasicInfoStateToIdb({
+      draft,
+      progress: currentStep,
+      isAgeLocked,
+    }).catch(() => {
+      setSaveError("We couldn't save your basic info draft on this device.");
+    });
+  }, [currentStep, draft, isAgeLocked, isHydrating, setSaveError]);
+
+  const draftStatus = useMemo(() => {
+    if (isHydrating) {
+      return "Preparing your saved draft...";
+    }
+
+    return hasSavedDraft
+      ? "Saved locally in IndexedDB on this device as you go."
+      : "Your answers will be saved locally in IndexedDB on this device.";
+  }, [hasSavedDraft, isHydrating]);
 
   const canContinue = isStepComplete(currentStep, draft);
   const isLastStep = currentStep === TOTAL_STEPS - 1;
@@ -272,7 +203,10 @@ function BasicInfoOnboardingClient() {
     }
 
     if (currentStep === 0 && Number(draft.age) < 18) {
-      writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
+      setIsAgeLocked(true);
+      void markBasicInfoAgeLockedInIdb(draft).catch(() => {
+        setSaveError("We couldn't update the local age gate on this device.");
+      });
       return;
     }
 
@@ -333,9 +267,12 @@ function BasicInfoOnboardingClient() {
         throw new Error("Please sign in before finishing this section.");
       }
 
-      await upsertUserPrivateInfo(user.id, userInfo);
-      writeStoredUserInfo(USER_INFO_STORAGE_KEY, userInfo);
-      setSaveMessage("Basic info saved. Your user_info row is up to date.");
+      await upsertUserBasicInfo(user.id, draft);
+      await upsertUserMatchesInfo({
+        userId: user.id,
+        basicInfo: draft,
+      });
+      setSaveMessage("Basic info saved to user_basic_info.");
     } catch (error) {
       setSaveError(
         error instanceof Error && error.message
@@ -423,7 +360,7 @@ function BasicInfoOnboardingClient() {
             className={styles.backButton}
             type="button"
             onClick={goBack}
-            disabled={currentStep === 0 || isSavingSection}
+            disabled={currentStep === 0 || isSavingSection || isHydrating}
           >
             Back
           </button>
@@ -431,7 +368,7 @@ function BasicInfoOnboardingClient() {
             className={styles.nextButton}
             type="button"
             onClick={isLastStep ? finishBasicInfo : goNext}
-            disabled={!canContinue || isSavingSection}
+            disabled={!canContinue || isSavingSection || isHydrating}
           >
             {isSavingSection ? "Saving..." : isLastStep ? "Finish basic info" : "Next"}
           </button>

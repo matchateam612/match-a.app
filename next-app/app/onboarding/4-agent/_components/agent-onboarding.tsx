@@ -1,21 +1,23 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import styles from "../../1-basics/page.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
-import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { upsertUserAgentProfile } from "@/lib/supabase/user-agent-profile";
+import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import type {
   CreateInitialAgentTurnResponse,
   CreateInitialVoiceTurnContextRequest,
   SubmitAgentTurnResponse,
 } from "../_lib/agent-api-types";
-import { defaultAgentCriteria } from "../_lib/agent-criteria";
+import { hasAgentDraftContent, persistAgentStateToIdb, readStoredAgentStateFromIdb } from "../_lib/agent-idb";
 import { buildDraftSummary, createTranscriptItem } from "../_lib/agent-orchestrator";
-import { hasAgentDraftContent, persistAgentState, readAgentPromptSettings, readStoredAgentState, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
+import { readAgentPromptSettings, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
 import { useAgentVoiceSession } from "../_lib/use-agent-voice-session";
 import { getVoiceScaffoldStatus } from "../_lib/agent-voice";
 import type { AgentOnboardingState, AgentConversationMode } from "../_lib/agent-types";
@@ -83,47 +85,87 @@ function AgentOnboardingClient() {
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const [isPreparingConversation, setIsPreparingConversation] = useState(false);
   const [pendingAssistantMessage, setPendingAssistantMessage] = useState("");
+  const [isHydrating, setIsHydrating] = useState(true);
+  const [draft, setDraft] = useState<AgentOnboardingState>({
+    sessionId: `agent-session-${Date.now()}`,
+    selectedMode: null,
+    turnCount: 0,
+    status: "collecting",
+    lastAskedCriterionId: null,
+    criteria: [],
+    transcript: [],
+    finalSummary: null,
+    completedAt: null,
+  });
+  const [progress, setProgress] = useState("collecting");
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const promptSettings = readAgentPromptSettings();
   const criteriaDefinitions = readTestingCriteriaDefinitions();
-
-  const buildUserInfo = useCallback(
-    ({
-      draft,
-      storedUserInfo,
-    }: {
-      draft: AgentOnboardingState;
-      progress: string;
-      storedUserInfo: UserInfo;
-    }) => ({
-      ...storedUserInfo,
+  const userInfo: UserInfo = useMemo(
+    () => ({
       agent: draft,
+      agent_system_prompt: promptSettings.interviewerSystemPrompt,
     }),
-    [],
+    [draft, promptSettings.interviewerSystemPrompt],
   );
 
-  const persistState = useCallback(
-    ({ draft, progress, userInfo }: { draft: AgentOnboardingState; progress: string; userInfo: UserInfo }) => {
-      persistAgentState({ draft, progress, userInfo });
-    },
-    [],
-  );
+  useEffect(() => {
+    let isCancelled = false;
 
-  const {
-    draft,
-    setDraft,
-    progress,
-    setProgress,
-    draftStatus,
-    saveMessage,
-    setSaveMessage,
-    saveError,
-    setSaveError,
-  } = useOnboardingSectionState({
-    readStoredState: () => readStoredAgentState(defaultAgentCriteria),
-    hasDraftContent: hasAgentDraftContent,
-    buildUserInfo,
-    persistState,
-  });
+    void readStoredAgentStateFromIdb(criteriaDefinitions, promptSettings)
+      .then((storedState) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setDraft(storedState.draft);
+        setProgress(storedState.progress);
+        setHasSavedDraft(storedState.hasSavedDraft);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setSaveError("We couldn't restore your saved agent conversation.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsHydrating(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [criteriaDefinitions, promptSettings]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    setHasSavedDraft(hasAgentDraftContent(draft, progress));
+
+    void persistAgentStateToIdb({
+      draft,
+      progress,
+      promptSettings,
+      criteriaDefinitions,
+    }).catch(() => {
+      setSaveError("We couldn't save your agent draft on this device.");
+    });
+  }, [criteriaDefinitions, draft, isHydrating, progress, promptSettings]);
+
+  const draftStatus = useMemo(() => {
+    if (isHydrating) {
+      return "Preparing your saved agent conversation...";
+    }
+
+    return hasSavedDraft
+      ? "Saved locally in IndexedDB on this device as you go."
+      : "Your agent conversation will be saved locally in IndexedDB on this device.";
+  }, [hasSavedDraft, isHydrating]);
 
   const { connectionStatus, activityLabel, liveTranscript, connect, disconnect, queueInitialVoiceTurnContext } = useAgentVoiceSession({
     enabled: draft.selectedMode === "voice" && draft.status !== "complete",
@@ -172,17 +214,15 @@ function AgentOnboardingClient() {
       criteriaDefinitions,
       criteria: nextDraft.criteria,
       interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
-      userInfo: buildUserInfo({
-        draft: nextDraft,
-        progress,
-        storedUserInfo: readStoredAgentState(defaultAgentCriteria).userInfo,
-      }),
+      userInfo: {
+        ...userInfo,
+        agent: nextDraft,
+      },
     }),
     [
-      buildUserInfo,
       criteriaDefinitions,
-      progress,
       promptSettings.interviewerSystemPrompt,
+      userInfo,
     ],
   );
 
@@ -234,11 +274,10 @@ function AgentOnboardingClient() {
             criteriaDefinitions,
             criteria: nextDraft.criteria,
             interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
-            userInfo: buildUserInfo({
-              draft: nextDraft,
-              progress,
-              storedUserInfo: readStoredAgentState(defaultAgentCriteria).userInfo,
-            }),
+            userInfo: {
+              ...userInfo,
+              agent: nextDraft,
+            },
           }),
         });
 
@@ -289,18 +328,17 @@ function AgentOnboardingClient() {
       }
     },
     [
-      buildUserInfo,
       buildInitialVoiceTurnContext,
       criteriaDefinitions,
       draft,
       isPreparingConversation,
-      progress,
       promptSettings.interviewerSystemPrompt,
       queueInitialVoiceTurnContext,
       setDraft,
       setProgress,
       setSaveError,
       setSaveMessage,
+      userInfo,
     ],
   );
 
@@ -443,6 +481,43 @@ function AgentOnboardingClient() {
   const draftSummary = buildDraftSummary(draft.criteria);
   const criteriaJson = JSON.stringify(draft.criteria, null, 2);
 
+  const saveAgentProfile = useCallback(async () => {
+    setSaveError("");
+    setSaveMessage("");
+
+    const nextDraft: AgentOnboardingState = {
+      ...draft,
+      status: "complete",
+      finalSummary: draft.finalSummary ?? draftSummary,
+      completedAt: draft.completedAt ?? new Date().toISOString(),
+    };
+
+    setDraft(nextDraft);
+    setProgress("complete");
+
+    try {
+      const user = await getCurrentUser();
+
+      if (!user) {
+        throw new Error("Please sign in before saving your agent profile.");
+      }
+
+      await upsertUserAgentProfile(user.id, nextDraft);
+      await upsertUserMatchesInfo({
+        userId: user.id,
+        agentSummary: nextDraft.finalSummary ?? draftSummary,
+      });
+
+      setSaveMessage("Agent profile saved to user_agent_profile.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error && error.message
+          ? error.message
+          : "We couldn't save your agent profile right now.",
+      );
+    }
+  }, [draft, draftSummary]);
+
   return (
     <AgentLayout
       eyebrow="Section 4"
@@ -462,22 +537,15 @@ function AgentOnboardingClient() {
             className={styles.backButton}
             type="button"
             onClick={() => router.push("/onboarding/3-picture")}
+            disabled={isHydrating}
           >
             Back
           </button>
           <button
             className={styles.nextButton}
             type="button"
-            onClick={() => {
-              setDraft((current) => ({
-                ...current,
-                status: "complete",
-                finalSummary: draftSummary,
-                completedAt: new Date().toISOString(),
-              }));
-              setProgress("complete");
-              setSaveMessage("Conversation progress saved locally.");
-            }}
+            onClick={() => void saveAgentProfile()}
+            disabled={isHydrating}
           >
             Save progress
           </button>
