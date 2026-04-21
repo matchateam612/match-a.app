@@ -32,52 +32,57 @@ export function EthnicityStep({
 
       <div className={styles.splitCard}>
         <div className={styles.stackCard}>
-          <span className={styles.inlineLabel}>
-            Which option is closest to your ethnicity or racial background?
-          </span>
-
-          <div className={styles.multiGrid}>
-            {ethnicityOptions.map((option) => (
-              <button
-                key={option.value}
-                className={`${styles.multiChip} ${
-                  ethnicity === option.value ? styles.multiChipActive : ""
-                }`.trim()}
-                type="button"
-                onClick={() => onEthnicityChange(option.value)}
-              >
-                <span className={styles.chipTitle}>{option.title}</span>
-              </button>
-            ))}
-          </div>
+          <label className={styles.fieldStack}>
+            <span className={styles.inlineLabel}>
+              Which option is closest to your ethnicity or racial background?
+            </span>
+            <select
+              className={styles.selectInput}
+              value={ethnicity}
+              onChange={(event) => onEthnicityChange(event.target.value as EthnicityOption)}
+            >
+              <option value="">Select one</option>
+              {ethnicityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className={styles.stackCard}>
-          <span className={styles.inlineLabel}>
-            Which ethnicities or races are you open to meeting?
-          </span>
+          <label className={styles.fieldStack}>
+            <span className={styles.inlineLabel}>
+              Which ethnicities or races are you open to meeting?
+            </span>
+            <select
+              className={`${styles.selectInput} ${styles.multiSelect}`.trim()}
+              multiple
+              value={preferredEthnicities}
+              onChange={(event) => {
+                const values = Array.from(event.target.selectedOptions, (option) => option.value);
+
+                preferredEthnicityOptions.forEach((option) => {
+                  const shouldBeSelected = values.includes(option.value);
+                  const isSelected = preferredEthnicities.includes(option.value);
+
+                  if (shouldBeSelected !== isSelected) {
+                    onPreferredEthnicityToggle(option.value);
+                  }
+                });
+              }}
+            >
+              {preferredEthnicityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className={styles.selectionSummary}>{selectedEthnicitySummary}</div>
-
-          <div className={styles.multiGrid}>
-            {preferredEthnicityOptions.map((option) => {
-              const isActive = preferredEthnicities.includes(option.value);
-
-              return (
-                <button
-                  key={option.value}
-                  className={`${styles.multiChip} ${
-                    isActive ? styles.multiChipActive : ""
-                  }`.trim()}
-                  type="button"
-                  onClick={() => onPreferredEthnicityToggle(option.value)}
-                >
-                  <span className={styles.chipTitle}>{option.title}</span>
-                  <span className={styles.chipCopy}>{option.copy}</span>
-                </button>
-              );
-            })}
-          </div>
+          <p className={styles.helper}>Hold Ctrl or Cmd to select more than one option.</p>
         </div>
       </div>
     </>

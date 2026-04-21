@@ -7,6 +7,7 @@ import {
   removeLocalStorageItem,
   readLocalStorageItem,
   useClientReady,
+  writeLocalStorageItem,
 } from "@/app/onboarding/_shared/onboarding-storage";
 import {
   readStoredProgressValue,
@@ -15,31 +16,30 @@ import {
   writeStoredUserInfo,
 } from "@/app/onboarding/_shared/onboarding-persistence";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
-import {
-  useOnboardingSectionState,
-} from "@/app/onboarding/_shared/use-onboarding-section-state";
+import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { upsertUserPrivateInfo } from "@/lib/supabase/user-private-info";
 import { BasicInfoLayout } from "./basic-info-layout";
 import {
+  BASIC_INFO_LOCK_STORAGE_KEY,
   BASIC_INFO_STEP_STORAGE_KEY,
   initialDraft,
   TOTAL_STEPS,
   USER_INFO_STORAGE_KEY,
 } from "./basic-info-data";
 import type { BasicInfoDraft, PreferredEthnicityOption } from "./basic-info-types";
+import { AgePreferenceStep } from "./steps/age-preference-step";
 import { AgeStep } from "./steps/age-step";
 import { EthnicityStep } from "./steps/ethnicity-step";
-import { GenderIdentityStep } from "./steps/gender-identity-step";
-import { InterestedInStep } from "./steps/interested-in-step";
-import { LocationStep } from "./steps/location-step";
+import { IdentityPreferenceStep } from "./steps/identity-preference-step";
 
 type StoredBasicInfoState = {
   progress: number;
   draft: BasicInfoDraft;
   hasSavedDraft: boolean;
+  isAgeLocked: boolean;
   userInfo: UserInfo;
 };
 
@@ -47,6 +47,7 @@ const emptyStoredState: StoredBasicInfoState = {
   progress: 0,
   draft: initialDraft,
   hasSavedDraft: false,
+  isAgeLocked: false,
   userInfo: {},
 };
 
@@ -60,6 +61,7 @@ function readStoredState(): StoredBasicInfoState {
   }
 
   const rawCurrentStep = readStoredProgressValue(BASIC_INFO_STEP_STORAGE_KEY);
+  const ageLock = readLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY) === "true";
   const legacyBasicInfo = readLocalStorageItem("matcha.onboarding.basic-info");
   let userInfo: UserInfo = readStoredUserInfo(USER_INFO_STORAGE_KEY);
 
@@ -74,6 +76,8 @@ function readStoredState(): StoredBasicInfoState {
         basic_info: {
           ...initialDraft,
           ...parsedLegacy,
+          preferredAgeMin: parsedLegacy.preferredAgeMin ?? initialDraft.preferredAgeMin,
+          preferredAgeMax: parsedLegacy.preferredAgeMax ?? initialDraft.preferredAgeMax,
           preferredEthnicities: Array.isArray(parsedLegacy.preferredEthnicities)
             ? parsedLegacy.preferredEthnicities
             : initialDraft.preferredEthnicities,
@@ -94,17 +98,25 @@ function readStoredState(): StoredBasicInfoState {
   const draft = {
     ...initialDraft,
     ...userInfo.basic_info,
+    preferredAgeMin: userInfo.basic_info?.preferredAgeMin ?? initialDraft.preferredAgeMin,
+    preferredAgeMax: userInfo.basic_info?.preferredAgeMax ?? initialDraft.preferredAgeMax,
     preferredEthnicities: Array.isArray(userInfo.basic_info?.preferredEthnicities)
       ? userInfo.basic_info.preferredEthnicities
       : initialDraft.preferredEthnicities,
   };
 
   const parsedCurrentStep = rawCurrentStep ? Number(rawCurrentStep) : 0;
+  const derivedAgeLock = draft.age.trim().length > 0 && Number(draft.age) < 18;
+
+  if (derivedAgeLock && !ageLock) {
+    writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
+  }
 
   return {
     progress: isValidStep(parsedCurrentStep) ? parsedCurrentStep : 0,
     draft,
     hasSavedDraft: Boolean(userInfo.basic_info),
+    isAgeLocked: ageLock || derivedAgeLock,
     userInfo,
   };
 }
@@ -112,20 +124,21 @@ function readStoredState(): StoredBasicInfoState {
 function isStepComplete(step: number, draft: BasicInfoDraft) {
   switch (step) {
     case 0:
-      return Number(draft.age) >= 18;
+      return draft.age.trim().length > 0;
     case 1:
-      return Boolean(
-        draft.genderIdentity &&
-          (draft.genderIdentity !== "custom" || draft.genderIdentityCustom.trim()),
+      return (
+        Number(draft.preferredAgeMin) >= 18 &&
+        Number(draft.preferredAgeMax) <= 80 &&
+        Number(draft.preferredAgeMin) <= Number(draft.preferredAgeMax)
       );
     case 2:
       return Boolean(
-        draft.interestedIn &&
+        draft.genderIdentity &&
+          (draft.genderIdentity !== "custom" || draft.genderIdentityCustom.trim()) &&
+          draft.interestedIn &&
           (draft.interestedIn !== "custom" || draft.interestedInCustom.trim()),
       );
     case 3:
-      return draft.city.trim().length > 1;
-    case 4:
       return Boolean(draft.ethnicity && draft.preferredEthnicities.length > 0);
     default:
       return false;
@@ -137,11 +150,12 @@ function hasDraftContent(draft: BasicInfoDraft, currentStep: number) {
     currentStep > 0 ||
     Boolean(
       draft.age ||
+        draft.preferredAgeMin ||
+        draft.preferredAgeMax ||
         draft.genderIdentity ||
         draft.genderIdentityCustom ||
         draft.interestedIn ||
         draft.interestedInCustom ||
-        draft.city ||
         draft.ethnicity ||
         draft.preferredEthnicities.length > 0,
     )
@@ -204,6 +218,7 @@ function BasicInfoOnboardingClient() {
     setDraft,
     progress: currentStep,
     setProgress: setCurrentStep,
+    isAgeLocked,
     userInfo,
     draftStatus,
     isSavingSection,
@@ -231,6 +246,30 @@ function BasicInfoOnboardingClient() {
       ...current,
       [key]: value,
     }));
+  }
+
+  function setAgeAndLockState(value: string) {
+    updateDraft("age", value);
+
+    if (value.trim() && Number(value) < 18) {
+      writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
+    }
+  }
+
+  function updatePreferredAgeRange(key: "preferredAgeMin" | "preferredAgeMax", value: string) {
+    setDraft((current) => {
+      const next = { ...current, [key]: value };
+
+      if (Number(next.preferredAgeMin) > Number(next.preferredAgeMax)) {
+        if (key === "preferredAgeMin") {
+          next.preferredAgeMax = value;
+        } else {
+          next.preferredAgeMin = value;
+        }
+      }
+
+      return next;
+    });
   }
 
   function goNext() {
@@ -309,33 +348,46 @@ function BasicInfoOnboardingClient() {
     }
   }
 
-  let stepContent = (
-    <AgeStep age={draft.age} onChange={(value) => updateDraft("age", value)} />
-  );
+  if (isAgeLocked) {
+    return (
+      <BasicInfoLayout currentStep={0} draftStatus="" hideProgress>
+        <div className={styles.warningCard}>
+          <p className={styles.questionLabel}>Access restricted</p>
+          <h1 className={styles.questionTitle}>You must be at least 18 to use Matcha.</h1>
+          <p className={styles.questionCopy}>
+            An age under 18 was entered on this device, so onboarding is now locked in local
+            storage and cannot continue from this screen.
+          </p>
+        </div>
+      </BasicInfoLayout>
+    );
+  }
+
+  let stepContent = <AgeStep age={draft.age} onChange={setAgeAndLockState} />;
 
   if (currentStep === 1) {
     stepContent = (
-      <GenderIdentityStep
-        genderIdentity={draft.genderIdentity}
-        genderIdentityCustom={draft.genderIdentityCustom}
-        onChange={(value) => updateDraft("genderIdentity", value)}
-        onCustomChange={(value) => updateDraft("genderIdentityCustom", value)}
+      <AgePreferenceStep
+        preferredAgeMin={draft.preferredAgeMin}
+        preferredAgeMax={draft.preferredAgeMax}
+        onMinChange={(value) => updatePreferredAgeRange("preferredAgeMin", value)}
+        onMaxChange={(value) => updatePreferredAgeRange("preferredAgeMax", value)}
       />
     );
   } else if (currentStep === 2) {
     stepContent = (
-      <InterestedInStep
+      <IdentityPreferenceStep
+        genderIdentity={draft.genderIdentity}
+        genderIdentityCustom={draft.genderIdentityCustom}
         interestedIn={draft.interestedIn}
         interestedInCustom={draft.interestedInCustom}
-        onChange={(value) => updateDraft("interestedIn", value)}
-        onCustomChange={(value) => updateDraft("interestedInCustom", value)}
+        onGenderIdentityChange={(value) => updateDraft("genderIdentity", value)}
+        onGenderIdentityCustomChange={(value) => updateDraft("genderIdentityCustom", value)}
+        onInterestedInChange={(value) => updateDraft("interestedIn", value)}
+        onInterestedInCustomChange={(value) => updateDraft("interestedInCustom", value)}
       />
     );
   } else if (currentStep === 3) {
-    stepContent = (
-      <LocationStep city={draft.city} onChange={(value) => updateDraft("city", value)} />
-    );
-  } else if (currentStep === 4) {
     stepContent = (
       <EthnicityStep
         ethnicity={draft.ethnicity}
@@ -375,11 +427,7 @@ function BasicInfoOnboardingClient() {
             onClick={isLastStep ? finishBasicInfo : goNext}
             disabled={!canContinue || isSavingSection}
           >
-            {isSavingSection
-              ? "Saving..."
-              : isLastStep
-                ? "Finish basic info"
-                : "Next"}
+            {isSavingSection ? "Saving..." : isLastStep ? "Finish basic info" : "Next"}
           </button>
         </>
       }

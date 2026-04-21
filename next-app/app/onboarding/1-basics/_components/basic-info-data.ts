@@ -8,16 +8,18 @@ import type {
 
 export const USER_INFO_STORAGE_KEY = "user_info";
 export const BASIC_INFO_STEP_STORAGE_KEY = "user_info.basic_info.current_step";
+export const BASIC_INFO_LOCK_STORAGE_KEY = "user_info.basic_info.age_locked";
 export const TOTAL_SECTIONS = 4;
-export const TOTAL_STEPS = 5;
+export const TOTAL_STEPS = 4;
 
 export const initialDraft: BasicInfoDraft = {
   age: "",
+  preferredAgeMin: "18",
+  preferredAgeMax: "35",
   genderIdentity: "",
   genderIdentityCustom: "",
   interestedIn: "",
   interestedInCustom: "",
-  city: "",
   ethnicity: "",
   preferredEthnicities: [],
 };

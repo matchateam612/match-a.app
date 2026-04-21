@@ -35,11 +35,12 @@ export type PreferredEthnicityOption =
 
 export type BasicInfoDraft = {
   age: string;
+  preferredAgeMin: string;
+  preferredAgeMax: string;
   genderIdentity: GenderIdentityOption | "";
   genderIdentityCustom: string;
   interestedIn: InterestedInOption | "";
   interestedInCustom: string;
-  city: string;
   ethnicity: EthnicityOption | "";
   preferredEthnicities: PreferredEthnicityOption[];
 };

@@ -29,7 +29,7 @@ export function AgeStep({ age, onChange }: AgeStepProps) {
           <input
             className={styles.numberInput}
             inputMode="numeric"
-            min={18}
+            min={0}
             max={99}
             placeholder="18"
             type="number"
