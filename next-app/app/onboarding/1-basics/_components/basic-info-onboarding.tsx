@@ -98,6 +98,7 @@ function readStoredState(): StoredBasicInfoState {
   const draft = {
     ...initialDraft,
     ...userInfo.basic_info,
+    phoneNumber: userInfo.basic_info?.phoneNumber ?? initialDraft.phoneNumber,
     preferredAgeMin: userInfo.basic_info?.preferredAgeMin ?? initialDraft.preferredAgeMin,
     preferredAgeMax: userInfo.basic_info?.preferredAgeMax ?? initialDraft.preferredAgeMax,
     preferredEthnicities: Array.isArray(userInfo.basic_info?.preferredEthnicities)
@@ -106,17 +107,12 @@ function readStoredState(): StoredBasicInfoState {
   };
 
   const parsedCurrentStep = rawCurrentStep ? Number(rawCurrentStep) : 0;
-  const derivedAgeLock = draft.age.trim().length > 0 && Number(draft.age) < 18;
-
-  if (derivedAgeLock && !ageLock) {
-    writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
-  }
 
   return {
     progress: isValidStep(parsedCurrentStep) ? parsedCurrentStep : 0,
     draft,
     hasSavedDraft: Boolean(userInfo.basic_info),
-    isAgeLocked: ageLock || derivedAgeLock,
+    isAgeLocked: ageLock,
     userInfo,
   };
 }
@@ -124,7 +120,7 @@ function readStoredState(): StoredBasicInfoState {
 function isStepComplete(step: number, draft: BasicInfoDraft) {
   switch (step) {
     case 0:
-      return draft.age.trim().length > 0;
+      return draft.age.trim().length > 0 && draft.phoneNumber.trim().length > 0;
     case 1:
       return (
         Number(draft.preferredAgeMin) >= 18 &&
@@ -150,6 +146,7 @@ function hasDraftContent(draft: BasicInfoDraft, currentStep: number) {
     currentStep > 0 ||
     Boolean(
       draft.age ||
+        draft.phoneNumber ||
         draft.preferredAgeMin ||
         draft.preferredAgeMax ||
         draft.genderIdentity ||
@@ -237,8 +234,7 @@ function BasicInfoOnboardingClient() {
     setSaveMessage,
   });
   const isAgeLocked =
-    readLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY) === "true" ||
-    (draft.age.trim().length > 0 && Number(draft.age) < 18);
+    readLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY) === "true";
 
   const canContinue = isStepComplete(currentStep, draft);
   const isLastStep = currentStep === TOTAL_STEPS - 1;
@@ -250,12 +246,8 @@ function BasicInfoOnboardingClient() {
     }));
   }
 
-  function setAgeAndLockState(value: string) {
+  function setAge(value: string) {
     updateDraft("age", value);
-
-    if (value.trim() && Number(value) < 18) {
-      writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
-    }
   }
 
   function updatePreferredAgeRange(key: "preferredAgeMin" | "preferredAgeMax", value: string) {
@@ -276,6 +268,11 @@ function BasicInfoOnboardingClient() {
 
   function goNext() {
     if (!canContinue || isLastStep) {
+      return;
+    }
+
+    if (currentStep === 0 && Number(draft.age) < 18) {
+      writeLocalStorageItem(BASIC_INFO_LOCK_STORAGE_KEY, "true");
       return;
     }
 
@@ -365,7 +362,14 @@ function BasicInfoOnboardingClient() {
     );
   }
 
-  let stepContent = <AgeStep age={draft.age} onChange={setAgeAndLockState} />;
+  let stepContent = (
+    <AgeStep
+      age={draft.age}
+      phoneNumber={draft.phoneNumber}
+      onAgeChange={setAge}
+      onPhoneNumberChange={(value) => updateDraft("phoneNumber", value)}
+    />
+  );
 
   if (currentStep === 1) {
     stepContent = (

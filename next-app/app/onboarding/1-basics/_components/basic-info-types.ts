@@ -35,6 +35,7 @@ export type PreferredEthnicityOption =
 
 export type BasicInfoDraft = {
   age: string;
+  phoneNumber: string;
   preferredAgeMin: string;
   preferredAgeMax: string;
   genderIdentity: GenderIdentityOption | "";

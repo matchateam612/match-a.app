@@ -2,30 +2,31 @@ import styles from "../../page.module.scss";
 
 type AgeStepProps = {
   age: string;
-  onChange: (value: string) => void;
+  phoneNumber: string;
+  onAgeChange: (value: string) => void;
+  onPhoneNumberChange: (value: string) => void;
 };
 
-export function AgeStep({ age, onChange }: AgeStepProps) {
+export function AgeStep({
+  age,
+  phoneNumber,
+  onAgeChange,
+  onPhoneNumberChange,
+}: AgeStepProps) {
   return (
     <>
       <div className={styles.questionMeta}>
-        <p className={styles.questionLabel}>Age</p>
-        <h2 className={styles.questionTitle}>How old are you?</h2>
+        <p className={styles.questionLabel}>Age and phone number</p>
+        <h2 className={styles.questionTitle}>Age and phone numbers</h2>
         <p className={styles.questionCopy}>
-          We use this for compliance, age filtering, and to place you in the appropriate matching
-          pool.
+          We use this for compliance, account contact, and to place you in the appropriate
+          matching pool.
         </p>
       </div>
 
       <div className={styles.ageWrap}>
-        <div className={styles.ageCard}>
-          <span className={styles.inlineLabel}>Current age</span>
-          <div className={styles.ageValue}>{age || "--"}</div>
-          <p className={styles.helper}>You must be at least 18 to use Matcha.</p>
-        </div>
-
         <label className={styles.fieldStack}>
-          <span className={styles.inlineLabel}>Enter your age</span>
+          <span className={styles.inlineLabel}>Age</span>
           <input
             className={styles.numberInput}
             inputMode="numeric"
@@ -34,9 +35,24 @@ export function AgeStep({ age, onChange }: AgeStepProps) {
             placeholder="18"
             type="number"
             value={age}
-            onChange={(event) => onChange(event.target.value)}
+            onChange={(event) => onAgeChange(event.target.value)}
           />
         </label>
+
+        <label className={styles.fieldStack}>
+          <span className={styles.inlineLabel}>Phone number</span>
+          <input
+            className={styles.input}
+            autoComplete="tel"
+            inputMode="tel"
+            placeholder="(555) 123-4567"
+            type="tel"
+            value={phoneNumber}
+            onChange={(event) => onPhoneNumberChange(event.target.value)}
+          />
+        </label>
+
+        <p className={styles.helper}>You must be at least 18 to use Matcha.</p>
       </div>
     </>
   );

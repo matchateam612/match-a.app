@@ -14,6 +14,7 @@ export const TOTAL_STEPS = 4;
 
 export const initialDraft: BasicInfoDraft = {
   age: "",
+  phoneNumber: "",
   preferredAgeMin: "18",
   preferredAgeMax: "35",
   genderIdentity: "",
