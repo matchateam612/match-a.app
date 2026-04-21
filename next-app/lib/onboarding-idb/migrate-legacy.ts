@@ -39,6 +39,10 @@ function readLocalStorageValue(key: string) {
   return window.localStorage.getItem(key);
 }
 
+function removeLocalStorageValue(key: string) {
+  window.localStorage.removeItem(key);
+}
+
 function readJson<T>(rawValue: string | null): T | null {
   if (!rawValue) {
     return null;
@@ -249,6 +253,16 @@ export async function migrateLegacyOnboardingStorageIfNeeded() {
       completedVersion: 1,
     },
   });
+
+  [
+    USER_INFO_KEY,
+    LEGACY_BASIC_INFO_KEY,
+    LEGACY_BASIC_INFO_STEP_KEY,
+    LEGACY_BASIC_INFO_LOCK_KEY,
+    LEGACY_MENTALITY_STEP_KEY,
+    LEGACY_PICTURE_STEP_KEY,
+    LEGACY_AGENT_STATUS_KEY,
+  ].forEach(removeLocalStorageValue);
 
   return nextDraft;
 }

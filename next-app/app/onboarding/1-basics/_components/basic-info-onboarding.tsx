@@ -270,10 +270,18 @@ function BasicInfoOnboardingClient() {
       }
 
       await upsertUserBasicInfo(user.id, draft);
-      await upsertUserMatchesInfo({
-        userId: user.id,
-        basicInfo: draft,
-      });
+      try {
+        await upsertUserMatchesInfo({
+          userId: user.id,
+          basicInfo: draft,
+        });
+      } catch (error) {
+        throw new Error(
+          error instanceof Error && error.message
+            ? `Basic info saved to user_basic_info, but user_matches_info could not be updated: ${error.message}`
+            : "Basic info saved to user_basic_info, but user_matches_info could not be updated.",
+        );
+      }
       setSaveMessage("Basic info saved to user_basic_info.");
       router.push("/onboarding/2-mentality");
     } catch (error) {
