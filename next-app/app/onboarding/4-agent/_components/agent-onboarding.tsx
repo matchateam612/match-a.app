@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import styles from "../../_shared/onboarding-shell.module.scss";
@@ -12,20 +12,20 @@ import { upsertUserAgentProfile } from "@/lib/supabase/user-agent-profile";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import type {
   CreateInitialAgentTurnResponse,
-  CreateInitialVoiceTurnContextRequest,
   SubmitAgentTurnResponse,
 } from "../_lib/agent-api-types";
-import { hasAgentDraftContent, persistAgentStateToIdb, readStoredAgentStateFromIdb } from "../_lib/agent-idb";
+import {
+  hasAgentDraftContent,
+  persistAgentStateToIdb,
+  readStoredAgentStateFromIdb,
+} from "../_lib/agent-idb";
 import { buildDraftSummary, createTranscriptItem } from "../_lib/agent-orchestrator";
 import { readAgentPromptSettings, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
-import { useAgentVoiceSession } from "../_lib/use-agent-voice-session";
-import { getVoiceScaffoldStatus } from "../_lib/agent-voice";
 import type { AgentOnboardingState, AgentConversationMode } from "../_lib/agent-types";
 import { AgentLayout } from "./agent-layout";
 import { AgentSummaryCard } from "./agent-summary-card";
 import { ChatPanel } from "./chat-panel";
 import { CompletionReview } from "./completion-review";
-import { ModePicker } from "./mode-picker";
 
 function isSubmitAgentTurnResponse(
   payload: SubmitAgentTurnResponse | { error?: string },
@@ -62,6 +62,12 @@ type StreamedAgentTurnEvent =
       message: string;
     };
 
+type PendingVoiceDraft = {
+  blob: Blob;
+  url: string;
+  error: string;
+};
+
 const MAX_AGENT_TURNS = 20;
 
 function getCappedStatus(
@@ -71,6 +77,34 @@ function getCappedStatus(
   return turnCount >= MAX_AGENT_TURNS ? "confirming" : status;
 }
 
+function findSpeakableBoundary(text: string, isFinal: boolean) {
+  if (isFinal) {
+    return text.length;
+  }
+
+  const sentenceMatches = [...text.matchAll(/[.!?]\s/g)];
+
+  if (sentenceMatches.length > 0) {
+    const lastMatch = sentenceMatches.at(-1);
+
+    if (lastMatch?.index !== undefined && lastMatch.index + 2 >= 24) {
+      return lastMatch.index + 2;
+    }
+  }
+
+  const commaMatches = [...text.matchAll(/[,;:]\s/g)];
+
+  if (commaMatches.length > 0) {
+    const lastMatch = commaMatches.at(-1);
+
+    if (lastMatch?.index !== undefined && lastMatch.index + 2 >= 80) {
+      return lastMatch.index + 2;
+    }
+  }
+
+  return 0;
+}
+
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
 
@@ -78,7 +112,7 @@ export function AgentOnboarding() {
     return (
       <AgentLayout
         eyebrow="Section 4"
-        title="Agent onboarding"
+        title="Agent conversation"
         description="Preparing your saved agent conversation..."
       >
         <div />
@@ -95,6 +129,9 @@ function AgentOnboardingClient() {
   const [isPreparingConversation, setIsPreparingConversation] = useState(false);
   const [pendingAssistantMessage, setPendingAssistantMessage] = useState("");
   const [isHydrating, setIsHydrating] = useState(true);
+  const [isSpeechMuted, setIsSpeechMuted] = useState(false);
+  const [currentInputMode, setCurrentInputMode] = useState<AgentConversationMode>("text");
+  const [pendingVoiceDraft, setPendingVoiceDraft] = useState<PendingVoiceDraft | null>(null);
   const [draft, setDraft] = useState<AgentOnboardingState>({
     sessionId: `agent-session-${Date.now()}`,
     selectedMode: null,
@@ -119,6 +156,71 @@ function AgentOnboardingClient() {
     }),
     [draft, promptSettings.interviewerSystemPrompt],
   );
+  const queuedSpeechLengthRef = useRef(0);
+
+  const cancelSpeech = useCallback(() => {
+    queuedSpeechLengthRef.current = 0;
+
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  const queueSpeechFromText = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (
+        draft.selectedMode !== "voice" ||
+        isSpeechMuted ||
+        typeof window === "undefined" ||
+        !("speechSynthesis" in window)
+      ) {
+        return;
+      }
+
+      while (queuedSpeechLengthRef.current < text.length) {
+        const remaining = text.slice(queuedSpeechLengthRef.current);
+        const boundary = findSpeakableBoundary(remaining, isFinal);
+
+        if (boundary <= 0) {
+          break;
+        }
+
+        const rawSegment = remaining.slice(0, boundary);
+        queuedSpeechLengthRef.current += boundary;
+        const segment = rawSegment.replace(/\s+/g, " ").trim();
+
+        if (!segment) {
+          continue;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(segment);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
+    },
+    [draft.selectedMode, isSpeechMuted],
+  );
+
+  useEffect(() => {
+    return () => {
+      cancelSpeech();
+    };
+  }, [cancelSpeech]);
+
+  useEffect(() => {
+    if (isSpeechMuted) {
+      cancelSpeech();
+    }
+  }, [cancelSpeech, isSpeechMuted]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingVoiceDraft) {
+        URL.revokeObjectURL(pendingVoiceDraft.url);
+      }
+    };
+  }, [pendingVoiceDraft]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -132,6 +234,7 @@ function AgentOnboardingClient() {
         setDraft(storedState.draft);
         setProgress(storedState.progress);
         setHasSavedDraft(storedState.hasSavedDraft);
+        setCurrentInputMode(storedState.draft.selectedMode ?? "text");
       })
       .catch(() => {
         if (!isCancelled) {
@@ -176,190 +279,100 @@ function AgentOnboardingClient() {
       : "Your agent conversation will be saved locally in IndexedDB on this device.";
   }, [hasSavedDraft, isHydrating]);
 
-  const { connectionStatus, activityLabel, liveTranscript, connect, disconnect, queueInitialVoiceTurnContext } = useAgentVoiceSession({
-    enabled: draft.selectedMode === "voice" && draft.status !== "complete",
-    transcript: draft.transcript,
-    criteria: draft.criteria,
-    criteriaDefinitions,
-    promptSettings,
-    onUserTranscript: (message) => {
-      setDraft((current) => ({
-        ...current,
-        turnCount: Math.min(current.turnCount + 1, MAX_AGENT_TURNS),
-        transcript: [...current.transcript, message],
-      }));
-    },
-    onAssistantTurn: (payload) => {
+  const ensureInitialAssistantTurn = useCallback(async () => {
+    if (
+      isHydrating ||
+      isPreparingConversation ||
+      !draft.selectedMode ||
+      draft.transcript.length > 0
+    ) {
+      return;
+    }
+
+    setIsPreparingConversation(true);
+    setSaveError("");
+    setSaveMessage("Preparing the opening message from your earlier onboarding answers.");
+
+    try {
+      const response = await fetch("/api/agent-turn/initial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedMode: draft.selectedMode,
+          criteriaDefinitions,
+          criteria: draft.criteria,
+          interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
+          userInfo,
+        }),
+      });
+
+      const payload = (await response.json()) as CreateInitialAgentTurnResponse | { error?: string };
+
+      if (!response.ok || !isCreateInitialAgentTurnResponse(payload)) {
+        throw new Error(
+          "error" in payload && payload.error
+            ? payload.error
+            : "The initial agent turn request failed.",
+        );
+      }
+
+      const initialTranscriptItem = createTranscriptItem({
+        role: "assistant",
+        modality: draft.selectedMode,
+        text: payload.assistantMessage,
+      });
       const nextStatus = getCappedStatus(draft.turnCount, payload.status);
 
       setDraft((current) => ({
         ...current,
-        criteria: payload.criteria,
-        transcript: [
-          ...current.transcript,
-          createTranscriptItem({
-            role: "assistant",
-            modality: "voice",
-            text: payload.assistantMessage,
-          }),
-        ],
+        transcript: [initialTranscriptItem],
         status: nextStatus,
         finalSummary: payload.draftSummary,
         lastAskedCriterionId: payload.lastAskedCriterionId,
       }));
       setProgress(nextStatus);
-      if (draft.turnCount >= MAX_AGENT_TURNS) {
-        setSaveMessage("Reached the 20-turn cap. The conversation is now ready for summary confirmation.");
+      setSaveMessage("Your onboarding conversation is ready.");
+
+      if (draft.selectedMode === "voice") {
+        cancelSpeech();
+        queueSpeechFromText(payload.assistantMessage, true);
       }
-    },
-    onStatusChange: (status) => {
-      setProgress(getCappedStatus(draft.turnCount, status));
-    },
-    onError: (message) => {
-      setSaveError(message);
-    },
-    onInfo: (message) => {
-      setSaveMessage(message);
-    },
-  });
-
-  const buildInitialVoiceTurnContext = useCallback(
-    (nextDraft: AgentOnboardingState): CreateInitialVoiceTurnContextRequest => ({
-      selectedMode: "voice",
-      criteriaDefinitions,
-      criteria: nextDraft.criteria,
-      interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
-      userInfo: {
-        ...userInfo,
-        agent: nextDraft,
-      },
-    }),
-    [
-      criteriaDefinitions,
-      promptSettings.interviewerSystemPrompt,
-      userInfo,
-    ],
-  );
-
-  const onSelectMode = useCallback(
-    async (mode: AgentConversationMode) => {
-      if (isPreparingConversation) {
-        return;
-      }
-
-      setSaveError("");
-      setSaveMessage(
-        mode === "voice"
-          ? "Preparing your first voice turn from the answers you already shared."
-          : "Preparing the first assistant message from your onboarding answers.",
+    } catch (error) {
+      setSaveMessage("");
+      setSaveError(
+        error instanceof Error ? error.message : "Could not prepare the first assistant turn.",
       );
-      setIsPreparingConversation(true);
+    } finally {
+      setIsPreparingConversation(false);
+    }
+  }, [
+    cancelSpeech,
+    criteriaDefinitions,
+    draft.criteria,
+    draft.selectedMode,
+    draft.transcript.length,
+    draft.turnCount,
+    isHydrating,
+    isPreparingConversation,
+    promptSettings.interviewerSystemPrompt,
+    queueSpeechFromText,
+    userInfo,
+  ]);
 
-      try {
-        const nextDraft =
-          draft.selectedMode === mode && draft.transcript.length
-            ? draft
-            : {
-                ...draft,
-                selectedMode: mode,
-                transcript: [] as typeof draft.transcript,
-                turnCount: 0,
-                status: "collecting" as const,
-                finalSummary: null,
-                completedAt: null,
-                lastAskedCriterionId: null,
-              };
+  useEffect(() => {
+    void ensureInitialAssistantTurn();
+  }, [ensureInitialAssistantTurn]);
 
-        if (nextDraft.transcript.length > 0) {
-          setDraft(nextDraft);
-          setProgress(nextDraft.status);
-          if (mode === "voice") {
-            queueInitialVoiceTurnContext(buildInitialVoiceTurnContext(nextDraft));
-          }
-          return;
-        }
-
-        const response = await fetch("/api/agent-turn/initial", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            selectedMode: mode,
-            criteriaDefinitions,
-            criteria: nextDraft.criteria,
-            interviewerSystemPrompt: promptSettings.interviewerSystemPrompt,
-            userInfo: {
-              ...userInfo,
-              agent: nextDraft,
-            },
-          }),
-        });
-
-        const payload = (await response.json()) as CreateInitialAgentTurnResponse | { error?: string };
-
-        if (!response.ok || !isCreateInitialAgentTurnResponse(payload)) {
-          throw new Error(
-            "error" in payload && payload.error
-              ? payload.error
-              : "The initial agent turn request failed.",
-          );
-        }
-
-        const initialTranscriptItem = createTranscriptItem({
-          role: "assistant",
-          modality: mode,
-          text: payload.assistantMessage,
-        });
-
-        setDraft({
-          ...nextDraft,
-          transcript: [initialTranscriptItem],
-          status: payload.status,
-          finalSummary: payload.draftSummary,
-          lastAskedCriterionId: payload.lastAskedCriterionId,
-        });
-        setProgress(payload.status);
-
-        if (mode === "voice") {
-          queueInitialVoiceTurnContext(buildInitialVoiceTurnContext({
-            ...nextDraft,
-            transcript: [initialTranscriptItem],
-            status: payload.status,
-            finalSummary: payload.draftSummary,
-            lastAskedCriterionId: payload.lastAskedCriterionId,
-          }));
-          setSaveMessage("Voice mode selected. The first assistant turn is now prepared from your stored onboarding context and will be generated through the voice session after connect.");
-        } else {
-          setSaveMessage("Text mode selected. The first assistant message is now generated from your stored onboarding context.");
-        }
-      } catch (error) {
-        setSaveMessage("");
-        setSaveError(
-          error instanceof Error ? error.message : "Could not prepare the first assistant turn.",
-        );
-      } finally {
-        setIsPreparingConversation(false);
-      }
-    },
-    [
-      buildInitialVoiceTurnContext,
-      criteriaDefinitions,
-      draft,
-      isPreparingConversation,
-      promptSettings.interviewerSystemPrompt,
-      queueInitialVoiceTurnContext,
-      setDraft,
-      setProgress,
-      setSaveError,
-      setSaveMessage,
-      userInfo,
-    ],
-  );
-
-  const onSubmitTextTurn = useCallback(
-    async (value: string) => {
-      if (isSubmittingTurn || !draft.selectedMode || draft.turnCount >= MAX_AGENT_TURNS) {
+  const submitUserTurn = useCallback(
+    async (value: string, modality: AgentConversationMode) => {
+      if (
+        isSubmittingTurn ||
+        !draft.selectedMode ||
+        draft.turnCount >= MAX_AGENT_TURNS ||
+        !value.trim()
+      ) {
         return;
       }
 
@@ -367,11 +380,12 @@ function AgentOnboardingClient() {
       setSaveMessage("");
       setIsSubmittingTurn(true);
       setPendingAssistantMessage("");
+      cancelSpeech();
 
       const userTranscriptItem = createTranscriptItem({
         role: "user",
-        modality: "text",
-        text: value,
+        modality,
+        text: value.trim(),
       });
 
       const requestTranscript = [...draft.transcript, userTranscriptItem];
@@ -391,7 +405,7 @@ function AgentOnboardingClient() {
           },
           body: JSON.stringify({
             selectedMode: draft.selectedMode,
-            userMessage: value,
+            userMessage: value.trim(),
             transcript: requestTranscript,
             criteriaDefinitions,
             criteria: draft.criteria,
@@ -408,15 +422,16 @@ function AgentOnboardingClient() {
         const decoder = new TextDecoder();
         let buffer = "";
         let completedPayload: SubmitAgentTurnResponse | null = null;
+        let streamedAssistantMessage = "";
 
         while (true) {
-          const { done, value } = await reader.read();
+          const { done, value: chunk } = await reader.read();
 
           if (done) {
             break;
           }
 
-          buffer += decoder.decode(value, { stream: true });
+          buffer += decoder.decode(chunk, { stream: true });
           const events = buffer.split("\n\n");
           buffer = events.pop() ?? "";
 
@@ -433,7 +448,9 @@ function AgentOnboardingClient() {
             const parsed = JSON.parse(line.slice("data:".length).trim()) as StreamedAgentTurnEvent;
 
             if (parsed.type === "assistant.delta") {
-              setPendingAssistantMessage((current) => `${current}${parsed.delta}`);
+              streamedAssistantMessage += parsed.delta;
+              setPendingAssistantMessage(streamedAssistantMessage);
+              queueSpeechFromText(streamedAssistantMessage, false);
               continue;
             }
 
@@ -452,7 +469,10 @@ function AgentOnboardingClient() {
           throw new Error("The streamed agent turn finished without a valid completion payload.");
         }
 
+        const assistantText = completedPayload.assistantMessage || streamedAssistantMessage;
+        queueSpeechFromText(assistantText, true);
         setPendingAssistantMessage("");
+
         setDraft((current) => ({
           ...current,
           criteria: completedPayload.criteria,
@@ -460,8 +480,8 @@ function AgentOnboardingClient() {
             ...requestTranscript,
             createTranscriptItem({
               role: "assistant",
-              modality: "text",
-              text: completedPayload.assistantMessage,
+              modality: current.selectedMode ?? "text",
+              text: assistantText,
             }),
           ],
           status: getCappedStatus(nextTurnCount, completedPayload.status),
@@ -473,10 +493,11 @@ function AgentOnboardingClient() {
         setSaveMessage(
           nextTurnCount >= MAX_AGENT_TURNS
             ? "Reached the 20-turn cap. The conversation is now ready for summary confirmation."
-            : "Agent turn streamed successfully. The interviewer reply now appears progressively in text mode.",
+            : "Agent turn streamed successfully.",
         );
       } catch (error) {
         setPendingAssistantMessage("");
+        cancelSpeech();
         setSaveError(
           error instanceof Error ? error.message : "The agent turn could not be processed.",
         );
@@ -485,19 +506,86 @@ function AgentOnboardingClient() {
       }
     },
     [
+      cancelSpeech,
       criteriaDefinitions,
       draft.criteria,
       draft.selectedMode,
-      draft.turnCount,
       draft.transcript,
+      draft.turnCount,
       isSubmittingTurn,
       promptSettings.interviewerSystemPrompt,
-      setDraft,
-      setProgress,
-      setSaveError,
-      setSaveMessage,
+      queueSpeechFromText,
     ],
   );
+
+  const onSubmitTextTurn = useCallback(
+    async (value: string) => {
+      await submitUserTurn(value, "text");
+    },
+    [submitUserTurn],
+  );
+
+  const onSubmitVoiceBlob = useCallback(
+    async (blob: Blob) => {
+      const formData = new FormData();
+      formData.append("file", blob, "voice-note.webm");
+
+      setSaveError("");
+      setSaveMessage("Transcribing your voice note...");
+
+      try {
+        const response = await fetch("/api/agent-voice/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+        const payload = (await response.json()) as { text?: string; error?: string };
+
+        if (!response.ok || typeof payload.text !== "string" || !payload.text.trim()) {
+          throw new Error(payload.error || "Voice transcription failed.");
+        }
+
+        if (pendingVoiceDraft) {
+          URL.revokeObjectURL(pendingVoiceDraft.url);
+          setPendingVoiceDraft(null);
+        }
+
+        await submitUserTurn(payload.text.trim(), "voice");
+      } catch (error) {
+        const nextDraft = {
+          blob,
+          url: URL.createObjectURL(blob),
+          error: error instanceof Error ? error.message : "Voice transcription failed.",
+        };
+
+        if (pendingVoiceDraft) {
+          URL.revokeObjectURL(pendingVoiceDraft.url);
+        }
+
+        setPendingVoiceDraft(nextDraft);
+        setSaveError("");
+        setSaveMessage("Voice note saved locally. Retry when you're ready.");
+      }
+    },
+    [pendingVoiceDraft, submitUserTurn],
+  );
+
+  const onRetryVoiceDraft = useCallback(async () => {
+    if (!pendingVoiceDraft) {
+      return;
+    }
+
+    await onSubmitVoiceBlob(pendingVoiceDraft.blob);
+  }, [onSubmitVoiceBlob, pendingVoiceDraft]);
+
+  const onDiscardVoiceDraft = useCallback(() => {
+    if (!pendingVoiceDraft) {
+      return;
+    }
+
+    URL.revokeObjectURL(pendingVoiceDraft.url);
+    setPendingVoiceDraft(null);
+    setSaveMessage("Discarded the unsent voice note.");
+  }, [pendingVoiceDraft]);
 
   const draftSummary = buildDraftSummary(draft.criteria);
   const turnLimitReached = draft.turnCount >= MAX_AGENT_TURNS;
@@ -541,11 +629,37 @@ function AgentOnboardingClient() {
     }
   }, [draft, draftSummary, router]);
 
+  if (!isHydrating && !draft.selectedMode) {
+    return (
+      <AgentLayout
+        eyebrow="Section 4"
+        title="Choose your conversation style first"
+        description="Pick text-first or voice-first before starting this onboarding chat."
+        footer={
+          <button
+            className={styles.backButton}
+            type="button"
+            onClick={() => router.push("/onboarding/4-agent")}
+          >
+            Back to modality picker
+          </button>
+        }
+      >
+        <div className={styles.stackCard}>
+          <span className={styles.inlineLabel}>Missing setup</span>
+          <p className={styles.helper} style={{ marginTop: 0, marginBottom: 0 }}>
+            This chat route needs a saved modality choice first.
+          </p>
+        </div>
+      </AgentLayout>
+    );
+  }
+
   return (
     <AgentLayout
       eyebrow="Section 4"
       title="Agent onboarding"
-      description="Scaffold the shared conversation engine first, then plug in the interviewer model, extractor, and voice transport."
+      description="One shared chat screen, with text-first or voice-first behavior depending on the style you picked."
       status={
         <OnboardingSectionStatus
           errorMessage={saveError}
@@ -559,7 +673,7 @@ function AgentOnboardingClient() {
           <button
             className={styles.backButton}
             type="button"
-            onClick={() => router.push("/onboarding/3-picture")}
+            onClick={() => router.push("/onboarding/4-agent")}
             disabled={isHydrating}
           >
             Back
@@ -575,31 +689,26 @@ function AgentOnboardingClient() {
         </>
       }
     >
-      {/* <div className={styles.stackCard}>
-        <span className={styles.inlineLabel}>Active interviewer prompt</span>
-        <p style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{promptSettings.interviewerSystemPrompt}</p>
-        <p className={styles.helper}>
-          Edit this in the testing system-prompt page. The real interviewer model should read from this same stored prompt setting.
-        </p>
-      </div> */}
-
-      <ModePicker selectedMode={draft.selectedMode} onSelectMode={onSelectMode} />
-
       <ChatPanel
         selectedMode={draft.selectedMode}
+        currentInputMode={currentInputMode}
         status={draft.status}
         transcript={draft.transcript}
         pendingAssistantMessage={pendingAssistantMessage}
-        voiceStatusMessage={getVoiceScaffoldStatus(draft.selectedMode)}
-        voiceConnectionStatus={connectionStatus}
-        voiceActivityLabel={activityLabel}
-        liveVoiceTranscript={liveTranscript}
         finalSummary={draft.finalSummary}
-        onSubmitTextTurn={onSubmitTextTurn}
         isSubmittingTurn={isSubmittingTurn || isPreparingConversation || turnLimitReached}
-        onConnectVoice={connect}
-        onDisconnectVoice={disconnect}
+        isSpeechMuted={isSpeechMuted}
+        pendingVoiceDraft={pendingVoiceDraft ? { url: pendingVoiceDraft.url, error: pendingVoiceDraft.error } : null}
+        onSetInputMode={setCurrentInputMode}
+        onSubmitTextTurn={onSubmitTextTurn}
+        onSubmitVoiceBlob={onSubmitVoiceBlob}
+        onRetryVoiceDraft={onRetryVoiceDraft}
+        onDiscardVoiceDraft={onDiscardVoiceDraft}
+        onToggleSpeechMute={() => {
+          setIsSpeechMuted((current) => !current);
+        }}
         onConfirmConversation={() => {
+          cancelSpeech();
           setDraft((current) => ({
             ...current,
             status: "complete",
@@ -615,6 +724,7 @@ function AgentOnboardingClient() {
       <CompletionReview
         draftSummary={draftSummary}
         onApplySummary={() => {
+          cancelSpeech();
           setDraft((current) => ({
             ...current,
             status: "confirming",

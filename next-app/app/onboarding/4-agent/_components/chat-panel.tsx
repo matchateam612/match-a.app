@@ -5,46 +5,69 @@ import type {
   AgentConversationMode,
   AgentConversationStatus,
   AgentTranscriptItem,
-  AgentVoiceConnectionStatus,
 } from "../_lib/agent-types";
-import { TextInputBar } from "./text-input-bar";
+import { AgentComposer } from "./agent-composer";
 import { TranscriptMessageList } from "./transcript-message-list";
-import { VoiceSessionPanel } from "./voice-session-panel";
+
+type PendingVoiceDraft = {
+  url: string;
+  error: string;
+};
 
 type ChatPanelProps = {
   selectedMode: AgentConversationMode | null;
+  currentInputMode: AgentConversationMode;
   status: AgentConversationStatus;
   transcript: AgentTranscriptItem[];
   pendingAssistantMessage?: string;
-  voiceStatusMessage: string;
-  voiceConnectionStatus?: AgentVoiceConnectionStatus;
-  voiceActivityLabel?: string;
-  liveVoiceTranscript?: string;
   isSubmittingTurn?: boolean;
   finalSummary: string | null;
+  isSpeechMuted: boolean;
+  pendingVoiceDraft: PendingVoiceDraft | null;
+  onSetInputMode: (mode: AgentConversationMode) => void;
   onSubmitTextTurn: (value: string) => void;
+  onSubmitVoiceBlob: (blob: Blob) => void;
+  onRetryVoiceDraft: () => void;
+  onDiscardVoiceDraft: () => void;
   onConfirmConversation: () => void;
-  onConnectVoice: () => void;
-  onDisconnectVoice: () => void;
+  onToggleSpeechMute: () => void;
 };
+
+function SpeakerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M5 14h3l4 4V6L8 10H5zM16 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SpeakerMutedIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M5 14h3l4 4V6L8 10H5zM16 9l4 6M20 9l-4 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export function ChatPanel({
   selectedMode,
+  currentInputMode,
   status,
   transcript,
   pendingAssistantMessage = "",
-  voiceStatusMessage,
-  voiceConnectionStatus = "idle",
-  voiceActivityLabel = "Waiting to connect",
-  liveVoiceTranscript = "",
   isSubmittingTurn = false,
   finalSummary,
+  isSpeechMuted,
+  pendingVoiceDraft,
+  onSetInputMode,
   onSubmitTextTurn,
+  onSubmitVoiceBlob,
+  onRetryVoiceDraft,
+  onDiscardVoiceDraft,
   onConfirmConversation,
-  onConnectVoice,
-  onDisconnectVoice,
+  onToggleSpeechMute,
 }: ChatPanelProps) {
-  const showComposer = selectedMode === "text" && status !== "confirming" && status !== "complete";
+  const showComposer = status !== "confirming" && status !== "complete";
 
   return (
     <div
@@ -68,40 +91,30 @@ export function ChatPanel({
         <div>
           <span className={styles.inlineLabel}>AI conversation</span>
           <p className={styles.helper} style={{ marginTop: 6, marginBottom: 0 }}>
-            Text and voice now share the same turn flow, transcript, and profile updates.
+            One transcript, one summary engine, and a switchable input method.
           </p>
         </div>
-        {selectedMode ? (
-          <span className={styles.selectionSummary}>
-            {selectedMode === "text" ? "Text mode" : "Voice mode"} · {status}
-          </span>
-        ) : null}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {selectedMode ? (
+            <span className={styles.selectionSummary}>
+              {selectedMode === "text" ? "Text-first" : "Voice-first"} · {status}
+            </span>
+          ) : null}
+          {selectedMode === "voice" ? (
+            <button
+              type="button"
+              className={styles.backButton}
+              onClick={onToggleSpeechMute}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              {isSpeechMuted ? <SpeakerMutedIcon /> : <SpeakerIcon />}
+              {isSpeechMuted ? "Unmute" : "Mute"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {selectedMode === "voice" ? (
-        <VoiceSessionPanel
-          statusMessage={voiceStatusMessage}
-          connectionStatus={voiceConnectionStatus}
-          activityLabel={voiceActivityLabel}
-          liveTranscript={liveVoiceTranscript}
-          onConnect={onConnectVoice}
-          onDisconnect={onDisconnectVoice}
-        />
-      ) : null}
-
-      {!selectedMode ? (
-        <div className={styles.stackCard}>
-          <span className={styles.inlineLabel}>Conversation engine</span>
-          <p className={styles.helper}>
-            Choose a mode first. Text and voice share the same transcript, criteria state, and completion logic.
-          </p>
-        </div>
-      ) : null}
-
-      <TranscriptMessageList
-        transcript={transcript}
-        pendingAssistantMessage={selectedMode === "text" ? pendingAssistantMessage : ""}
-      />
+      <TranscriptMessageList transcript={transcript} pendingAssistantMessage={pendingAssistantMessage} />
 
       {status === "confirming" ? (
         <div
@@ -113,7 +126,7 @@ export function ChatPanel({
         >
           <span className={styles.inlineLabel}>Ready to finish</span>
           <p style={{ marginTop: 0, marginBottom: 8 }}>
-            The agent believes every criterion is strongly confirmed with at least 80% confidence.
+            The chat is ready to wrap with the current summary.
           </p>
           {finalSummary ? <p style={{ marginTop: 0, marginBottom: 8 }}>{finalSummary}</p> : null}
           <p className={styles.helper} style={{ marginTop: 0 }}>
@@ -128,11 +141,16 @@ export function ChatPanel({
       ) : null}
 
       {showComposer ? (
-        <TextInputBar
+        <AgentComposer
+          currentInputMode={currentInputMode}
           disabled={isSubmittingTurn}
-          placeholder={isSubmittingTurn ? "The agent is thinking..." : "Message the onboarding agent..."}
-          submitLabel={isSubmittingTurn ? "Sending..." : "Send"}
-          onSubmit={onSubmitTextTurn}
+          voiceModeEnabled
+          pendingVoiceDraft={pendingVoiceDraft}
+          onSetInputMode={onSetInputMode}
+          onSubmitText={onSubmitTextTurn}
+          onSubmitVoiceBlob={onSubmitVoiceBlob}
+          onRetryVoiceDraft={onRetryVoiceDraft}
+          onDiscardVoiceDraft={onDiscardVoiceDraft}
         />
       ) : null}
     </div>

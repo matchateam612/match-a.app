@@ -1,5 +1,5 @@
-import { AgentOnboarding } from "./_components/agent-onboarding";
+import { AgentModalityPage } from "./_components/agent-modality-page";
 
 export default function OnboardingAgentPage() {
-  return <AgentOnboarding />;
+  return <AgentModalityPage />;
 }
