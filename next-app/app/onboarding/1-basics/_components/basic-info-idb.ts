@@ -3,7 +3,7 @@
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { migrateLegacyOnboardingStorageIfNeeded } from "@/lib/onboarding-idb/migrate-legacy";
 import { updateOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
-import { updateOnboardingSyncRecord } from "@/lib/onboarding-idb/sync-store";
+import { markOnboardingSectionDirty } from "@/lib/onboarding-idb/section-sync";
 import { initialDraft, TOTAL_STEPS } from "./basic-info-data";
 import type { BasicInfoDraft } from "./basic-info-types";
 
@@ -83,17 +83,7 @@ export async function persistBasicInfoStateToIdb(args: {
     },
   }));
 
-  await updateOnboardingSyncRecord((current) => ({
-    ...current,
-    sections: {
-      ...current.sections,
-      basicInfo: {
-        ...current.sections.basicInfo,
-        dirty: true,
-        syncError: null,
-      },
-    },
-  }));
+  await markOnboardingSectionDirty("basicInfo");
 }
 
 export async function markBasicInfoAgeLockedInIdb(draft: BasicInfoDraft) {

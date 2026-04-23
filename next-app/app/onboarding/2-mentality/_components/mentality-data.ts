@@ -1,6 +1,7 @@
 import type {
   CasualFrequencyOption,
   MentalityDraft,
+  MentalityProgress,
   OpenStyleOption,
   RelationshipIntent,
   SeriousPaceOption,
@@ -26,7 +27,7 @@ export const initialDraft: MentalityDraft = {
   },
 };
 
-export const initialProgress = {
+export const initialProgress: MentalityProgress = {
   branch: "" as RelationshipIntent | "",
   currentStepId: "relationship_intent",
   completedStepIds: [],

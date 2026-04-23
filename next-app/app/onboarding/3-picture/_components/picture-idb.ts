@@ -3,7 +3,7 @@
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { migrateLegacyOnboardingStorageIfNeeded } from "@/lib/onboarding-idb/migrate-legacy";
 import { updateOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
-import { updateOnboardingSyncRecord } from "@/lib/onboarding-idb/sync-store";
+import { markOnboardingSectionDirty } from "@/lib/onboarding-idb/section-sync";
 import { initialDraft } from "./picture-data";
 import type { PictureDraft } from "./picture-types";
 
@@ -54,17 +54,7 @@ export async function persistPictureStateToIdb(args: {
     },
   }));
 
-  await updateOnboardingSyncRecord((current) => ({
-    ...current,
-    sections: {
-      ...current.sections,
-      picture: {
-        ...current.sections.picture,
-        dirty: true,
-        syncError: null,
-      },
-    },
-  }));
+  await markOnboardingSectionDirty("picture");
 }
 
 export function hasPictureDraftContent(draft: PictureDraft) {

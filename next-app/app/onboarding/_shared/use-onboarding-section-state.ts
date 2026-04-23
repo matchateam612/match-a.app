@@ -2,80 +2,130 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { UserInfo } from "./user-info-types";
-
 type StoredSectionState<TDraft, TProgress> = {
   draft: TDraft;
   progress: TProgress;
   hasSavedDraft: boolean;
-  userInfo: UserInfo;
 };
 
-type UseOnboardingSectionStateOptions<TDraft, TProgress> = {
-  readStoredState: () => StoredSectionState<TDraft, TProgress>;
+type UseOnboardingSectionStateOptions<
+  TDraft,
+  TProgress,
+  TStoredState extends StoredSectionState<TDraft, TProgress>,
+> = {
+  initialDraft: TDraft;
+  initialProgress: TProgress;
+  readStoredState: () => Promise<TStoredState>;
   hasDraftContent: (draft: TDraft, progress: TProgress) => boolean;
-  buildUserInfo: (args: {
-    draft: TDraft;
-    progress: TProgress;
-    storedUserInfo: UserInfo;
-  }) => UserInfo;
   persistState: (args: {
     draft: TDraft;
     progress: TProgress;
-    userInfo: UserInfo;
-  }) => void;
+  }) => Promise<void>;
+  onStoredStateLoaded?: (storedState: TStoredState) => void;
+  hydrationErrorMessage: string;
+  persistenceErrorMessage: string;
+  emptyDraftStatus?: string;
+  savedDraftStatus?: string;
 };
 
-export function getLocalDraftStatus(hasSavedDraft: boolean) {
+export function getLocalDraftStatus(hasSavedDraft: boolean, args?: {
+  emptyDraftStatus?: string;
+  savedDraftStatus?: string;
+}) {
   if (hasSavedDraft) {
-    return "Saved locally on this device as you go.";
+    return args?.savedDraftStatus ?? "Saved locally in IndexedDB on this device as you go.";
   }
 
-  return "Your answers will be saved locally on this device.";
+  return args?.emptyDraftStatus ?? "Your answers will be saved locally in IndexedDB on this device.";
 }
 
-export function useOnboardingSectionState<TDraft, TProgress>({
+export function useOnboardingSectionState<
+  TDraft,
+  TProgress,
+  TStoredState extends StoredSectionState<TDraft, TProgress>,
+>({
+  initialDraft,
+  initialProgress,
   readStoredState,
   hasDraftContent,
-  buildUserInfo,
   persistState,
-}: UseOnboardingSectionStateOptions<TDraft, TProgress>) {
-  const [storedState] = useState(readStoredState);
-  const [draft, setDraft] = useState<TDraft>(storedState.draft);
-  const [progress, setProgress] = useState<TProgress>(storedState.progress);
+  onStoredStateLoaded,
+  hydrationErrorMessage,
+  persistenceErrorMessage,
+  emptyDraftStatus,
+  savedDraftStatus,
+}: UseOnboardingSectionStateOptions<TDraft, TProgress, TStoredState>) {
+  const [draft, setDraft] = useState<TDraft>(initialDraft);
+  const [progress, setProgress] = useState<TProgress>(initialProgress);
+  const [initialHasSavedDraft, setInitialHasSavedDraft] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(true);
   const [isSavingSection, setIsSavingSection] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
-  const userInfo = useMemo(
-    () =>
-      buildUserInfo({
-        draft,
-        progress,
-        storedUserInfo: storedState.userInfo,
-      }),
-    [buildUserInfo, draft, progress, storedState.userInfo],
-  );
+  useEffect(() => {
+    let isCancelled = false;
+
+    void readStoredState()
+      .then((storedState) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setDraft(storedState.draft);
+        setProgress(storedState.progress);
+        setInitialHasSavedDraft(storedState.hasSavedDraft);
+        onStoredStateLoaded?.(storedState);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setSaveError(hydrationErrorMessage);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsHydrating(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [hydrationErrorMessage, onStoredStateLoaded, readStoredState]);
 
   useEffect(() => {
-    persistState({
+    if (isHydrating) {
+      return;
+    }
+
+    void persistState({
       draft,
       progress,
-      userInfo,
+    }).catch(() => {
+      setSaveError(persistenceErrorMessage);
     });
-  }, [draft, persistState, progress, userInfo]);
+  }, [draft, hasDraftContent, isHydrating, persistState, persistenceErrorMessage, progress]);
 
-  const draftStatus = getLocalDraftStatus(
-    storedState.hasSavedDraft || hasDraftContent(draft, progress),
-  );
+  const hasSavedDraft = initialHasSavedDraft || hasDraftContent(draft, progress);
+
+  const draftStatus = useMemo(() => {
+    if (isHydrating) {
+      return "Preparing your saved draft...";
+    }
+
+    return getLocalDraftStatus(hasSavedDraft, {
+      emptyDraftStatus,
+      savedDraftStatus,
+    });
+  }, [emptyDraftStatus, hasSavedDraft, isHydrating, savedDraftStatus]);
 
   return {
-    storedState,
     draft,
     setDraft,
     progress,
     setProgress,
-    userInfo,
+    hasSavedDraft,
+    isHydrating,
     draftStatus,
     isSavingSection,
     setIsSavingSection,

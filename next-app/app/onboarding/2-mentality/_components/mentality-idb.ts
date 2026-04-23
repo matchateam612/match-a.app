@@ -3,7 +3,7 @@
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { migrateLegacyOnboardingStorageIfNeeded } from "@/lib/onboarding-idb/migrate-legacy";
 import { updateOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
-import { updateOnboardingSyncRecord } from "@/lib/onboarding-idb/sync-store";
+import { markOnboardingSectionDirty } from "@/lib/onboarding-idb/section-sync";
 import { getFirstBranchStepId, getMentalityFlow, type MentalityStepId } from "./mentality-flow";
 import { initialDraft, initialProgress } from "./mentality-data";
 import type { MentalityDraft, MentalityProgress } from "./mentality-types";
@@ -184,17 +184,7 @@ export async function persistMentalityStateToIdb(args: {
     },
   }));
 
-  await updateOnboardingSyncRecord((current) => ({
-    ...current,
-    sections: {
-      ...current.sections,
-      mentality: {
-        ...current.sections.mentality,
-        dirty: true,
-        syncError: null,
-      },
-    },
-  }));
+  await markOnboardingSectionDirty("mentality");
 }
 
 export function hasMentalityDraftContent(draft: MentalityDraft) {

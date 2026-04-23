@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import styles from "../../_shared/onboarding-shell.module.scss";
 import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
+import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { upsertUserBasicInfo } from "@/lib/supabase/user-basic-info";
@@ -97,77 +98,48 @@ export function BasicInfoOnboarding() {
 
 function BasicInfoOnboardingClient() {
   const router = useRouter();
-  const [isHydrating, setIsHydrating] = useState(true);
-  const [draft, setDraft] = useState<BasicInfoDraft>(initialDraft);
-  const [currentStep, setCurrentStep] = useState(0);
   const [isAgeLocked, setIsAgeLocked] = useState(false);
-  const [hasSavedDraft, setHasSavedDraft] = useState(false);
-  const [isSavingSection, setIsSavingSection] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [saveError, setSaveError] = useState("");
+  const readStoredState = useCallback(readStoredBasicInfoStateFromIdb, []);
+  const persistState = useCallback(
+    async (args: { draft: BasicInfoDraft; progress: number }) => {
+      await persistBasicInfoStateToIdb({
+        draft: args.draft,
+        progress: args.progress,
+        isAgeLocked,
+      });
+    },
+    [isAgeLocked],
+  );
+  const onStoredStateLoaded = useCallback((storedState: Awaited<ReturnType<typeof readStoredBasicInfoStateFromIdb>>) => {
+    setIsAgeLocked(storedState.isAgeLocked);
+  }, []);
+  const {
+    draft,
+    setDraft,
+    progress: currentStep,
+    setProgress: setCurrentStep,
+    isHydrating,
+    draftStatus,
+    isSavingSection,
+    setIsSavingSection,
+    saveMessage,
+    setSaveMessage,
+    saveError,
+    setSaveError,
+  } = useOnboardingSectionState({
+    initialDraft,
+    initialProgress: 0,
+    readStoredState,
+    hasDraftContent,
+    persistState,
+    onStoredStateLoaded,
+    hydrationErrorMessage: "We couldn't restore your saved basic info draft.",
+    persistenceErrorMessage: "We couldn't save your basic info draft on this device.",
+  });
   const { clearSaveFeedback } = useSectionSaveFeedback({
     setSaveError,
     setSaveMessage,
   });
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    void readStoredBasicInfoStateFromIdb()
-      .then((storedState) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setDraft(storedState.draft);
-        setCurrentStep(storedState.progress);
-        setIsAgeLocked(storedState.isAgeLocked);
-        setHasSavedDraft(storedState.hasSavedDraft);
-      })
-      .catch(() => {
-        if (isCancelled) {
-          return;
-        }
-
-        setSaveError("We couldn't restore your saved basic info draft.");
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsHydrating(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [setSaveError]);
-
-  useEffect(() => {
-    if (isHydrating) {
-      return;
-    }
-
-    const nextHasSavedDraft = hasDraftContent(draft, currentStep);
-    setHasSavedDraft(nextHasSavedDraft);
-
-    void persistBasicInfoStateToIdb({
-      draft,
-      progress: currentStep,
-      isAgeLocked,
-    }).catch(() => {
-      setSaveError("We couldn't save your basic info draft on this device.");
-    });
-  }, [currentStep, draft, isAgeLocked, isHydrating, setSaveError]);
-
-  const draftStatus = useMemo(() => {
-    if (isHydrating) {
-      return "Preparing your saved draft...";
-    }
-
-    return hasSavedDraft
-      ? "Saved locally in IndexedDB on this device as you go."
-      : "Your answers will be saved locally in IndexedDB on this device.";
-  }, [hasSavedDraft, isHydrating]);
 
   const canContinue = isStepComplete(currentStep, draft);
   const isLastStep = currentStep === TOTAL_STEPS - 1;
