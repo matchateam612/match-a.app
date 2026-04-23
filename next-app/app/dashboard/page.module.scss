@@ -10,8 +10,10 @@
 }
 
 .topBar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  right: 0;
+  left: 0;
   z-index: 20;
   width: 100%;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
@@ -28,7 +30,7 @@
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
-  padding: 16px 24px;
+  padding: 12px 18px;
 }
 
 .brand {
@@ -50,7 +52,7 @@
 
 .brandName {
   font-family: var(--font-geist-sans);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.04em;
   background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
@@ -101,7 +103,421 @@
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
-  padding: 20px 24px calc(#{$bottom-nav-height} + 24px);
+  padding: 92px 18px 132px;
+}
+
+.drawerScrim,
+.drawerScrimOpen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: rgba(27, 28, 28, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity $transition-base;
+}
+
+.drawerScrimOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer,
+.drawerOpen {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(84vw, 336px);
+  padding: 24px 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0 28px 28px 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 161, 138, 0.2), transparent 36%),
+    color-mix(in srgb, var(--color-surface-primary) 94%, transparent);
+  box-shadow: 24px 0 80px rgba(27, 28, 28, 0.18);
+  transform: translateX(-108%);
+  transition: transform $transition-base;
+}
+
+.drawerOpen {
+  transform: translateX(0);
+}
+
+.drawerProfile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 8px 24px;
+}
+
+.drawerAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.92) 0 18%, transparent 19%),
+    radial-gradient(circle at 50% 105%, rgba(255, 255, 255, 0.82) 0 36%, transparent 37%),
+    linear-gradient(135deg, var(--color-brand-primary-soft), var(--color-brand-tertiary-soft));
+}
+
+.drawerName {
+  font-family: var(--font-geist-sans);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.drawerKicker,
+.drawerSectionLabel {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.drawerNav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.drawerItem,
+.drawerItemActive,
+.drawerGroupButton,
+.drawerSubItem,
+.drawerSubItemActive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: $radius-pill;
+  color: var(--color-text-secondary);
+  font-family: var(--font-geist-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.drawerItem,
+.drawerItemActive,
+.drawerGroupButton {
+  padding: 13px 14px;
+}
+
+.drawerItemActive {
+  background: linear-gradient(135deg, rgba(147, 73, 55, 0.14), rgba(77, 202, 211, 0.13));
+  color: var(--color-brand-primary);
+}
+
+.drawerGroupButton {
+  justify-content: space-between;
+  background: transparent;
+}
+
+.drawerGroupLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawerCount {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: $radius-pill;
+  background: rgba(147, 73, 55, 0.12);
+  color: var(--color-brand-primary);
+  font-size: 12px;
+}
+
+.drawerSubList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 8px 24px;
+}
+
+.drawerSubItem,
+.drawerSubItemActive {
+  justify-content: space-between;
+  padding: 11px 14px;
+}
+
+.drawerSubItemActive {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+}
+
+.drawerThreadName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unreadDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e33d3d;
+  box-shadow: 0 0 0 5px rgba(227, 61, 61, 0.12);
+}
+
+.drawerSectionLabel {
+  padding: 18px 14px 4px;
+}
+
+.chatCanvas {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.homeHero {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+}
+
+.homeTitle {
+  max-width: 720px;
+  font-family: var(--font-geist-sans);
+  font-size: clamp(2.35rem, 12vw, 4.6rem);
+  font-weight: 850;
+  line-height: 0.96;
+  letter-spacing: -0.065em;
+}
+
+.insightCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(147, 73, 55, 0.14), rgba(77, 202, 211, 0.12)),
+    var(--color-surface-primary);
+  box-shadow: $shadow-soft;
+}
+
+.insightTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.insightCopy {
+  color: var(--color-text-tertiary);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.messageCluster,
+.userMessageRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.messageStack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 680px;
+}
+
+.assistantAvatar,
+.userAvatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-family: var(--font-geist-sans);
+  font-weight: 800;
+}
+
+.assistantAvatar {
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+}
+
+.userAvatar {
+  background: var(--color-surface-secondary);
+  color: var(--color-brand-primary);
+}
+
+.assistantBubble,
+.userBubble {
+  padding: 16px 18px;
+  border-radius: 22px;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.assistantBubble {
+  border-top-left-radius: 6px;
+  background: var(--color-surface-primary);
+  box-shadow: $shadow-soft;
+}
+
+.userMessageRow {
+  justify-content: flex-end;
+}
+
+.userBubble {
+  max-width: min(520px, 78%);
+  border-top-right-radius: 6px;
+  background: linear-gradient(135deg, rgba(147, 73, 55, 0.14), rgba(77, 202, 211, 0.14));
+}
+
+.matchFeatureCard {
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--color-surface-primary);
+  box-shadow: $shadow-soft;
+}
+
+.matchPhoto {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.82) 0 13%, transparent 14%),
+    radial-gradient(circle at 50% 114%, rgba(255, 255, 255, 0.68) 0 30%, transparent 31%),
+    linear-gradient(145deg, rgba(147, 73, 55, 0.52), rgba(77, 202, 211, 0.36));
+  color: rgba(255, 255, 255, 0.86);
+  font-family: var(--font-geist-sans);
+  font-size: 6rem;
+  font-weight: 850;
+}
+
+.matchCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.matchName {
+  font-family: var(--font-geist-sans);
+  font-size: 1.75rem;
+  font-weight: 850;
+  letter-spacing: -0.055em;
+}
+
+.matchLocation {
+  color: var(--color-text-tertiary);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.matchTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.matchTag {
+  padding: 8px 11px;
+  border-radius: $radius-pill;
+  background: rgba(147, 73, 55, 0.1);
+  color: var(--color-brand-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.composerShell {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  padding: 30px 18px 22px;
+  background: linear-gradient(180deg, rgba(251, 249, 248, 0), rgba(251, 249, 248, 0.95) 34%);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.composerReply {
+  align-self: flex-start;
+  padding: 9px 12px;
+  border-radius: 16px;
+  background: var(--color-surface-primary);
+  color: var(--color-text-tertiary);
+  font-size: 0.9rem;
+  box-shadow: $shadow-soft;
+}
+
+.composerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-surface-primary) 88%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow: $shadow-bottom-bar;
+}
+
+.composerIconButton,
+.composerSendButton {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  height: 44px;
+  border: 0;
+  border-radius: $radius-pill;
+  font-family: var(--font-geist-sans);
+  font-weight: 800;
+}
+
+.composerIconButton {
+  width: 44px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
+.composerInput {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+}
+
+.composerSendButton {
+  padding: 0 16px;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .stack {
