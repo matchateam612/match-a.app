@@ -69,32 +69,24 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const showComposer = status !== "confirming" && status !== "complete";
 
-  return (
-    <div
-      className={styles.stackCard}
+    return (
+      <div
+      className={`${styles.stackCard} ${styles.agentSurface}`.trim()}
       style={{
         gap: 16,
         padding: 18,
-        background: "#eef4ff",
         border: "1px solid rgba(29, 78, 216, 0.08)",
+        background: "#eef4ff",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
+      <div className={`${styles.rowBetween} ${styles.rowWrap}`.trim()}>
         <div>
           <span className={styles.inlineLabel}>AI conversation</span>
           <p className={styles.helper} style={{ marginTop: 6, marginBottom: 0 }}>
             One transcript, one summary engine, and a switchable input method.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className={styles.rowWrap}>
           {selectedMode ? (
             <span className={styles.selectionSummary}>
               {selectedMode === "text" ? "Text-first" : "Voice-first"} · {status}
@@ -103,9 +95,8 @@ export function ChatPanel({
           {selectedMode === "voice" ? (
             <button
               type="button"
-              className={styles.backButton}
+              className={`${styles.backButton} ${styles.inlineButtonIcon}`.trim()}
               onClick={onToggleSpeechMute}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
             >
               {isSpeechMuted ? <SpeakerMutedIcon /> : <SpeakerIcon />}
               {isSpeechMuted ? "Unmute" : "Mute"}
@@ -132,7 +123,7 @@ export function ChatPanel({
           <p className={styles.helper} style={{ marginTop: 0 }}>
             If this summary matches what the user meant, confirm and end the onboarding chat.
           </p>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div className={styles.rowEnd}>
             <button type="button" className={styles.nextButton} onClick={onConfirmConversation}>
               Confirm and finish
             </button>

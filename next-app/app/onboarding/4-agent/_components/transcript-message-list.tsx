@@ -15,12 +15,10 @@ export function TranscriptMessageList({
   if (!transcript.length && !pendingAssistantMessage) {
     return (
       <div
-        className={styles.stackCard}
+        className={`${styles.stackCard} ${styles.agentSurfaceSoft}`.trim()}
         style={{
           minHeight: 240,
           alignContent: "center",
-          background: "linear-gradient(180deg, #f8fafc, #ffffff)",
-          border: "1px solid rgba(15, 23, 42, 0.08)",
         }}
       >
         <div style={{ maxWidth: 420 }}>
@@ -35,106 +33,49 @@ export function TranscriptMessageList({
 
   return (
     <div
-      className={styles.stackCard}
+      className={`${styles.stackCard} ${styles.agentSurfaceSoft}`.trim()}
       style={{
         minHeight: 260,
         gap: 12,
-        background: "linear-gradient(180deg, #f8fafc, #ffffff)",
-        border: "1px solid rgba(15, 23, 42, 0.08)",
       }}
     >
       <span className={styles.inlineLabel}>Conversation</span>
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className={styles.chatMessageList}>
         {transcript.map((message) => (
           <article
             key={message.id}
-            style={{
-              display: "grid",
-              justifyItems: message.role === "assistant" ? "start" : "end",
-            }}
+            className={`${styles.chatMessage} ${
+              message.role === "assistant" ? styles.chatMessageAssistant : styles.chatMessageUser
+            }`.trim()}
           >
-            <div
-              style={{
-                width: "min(100%, 640px)",
-                display: "grid",
-                gap: 6,
-              }}
-            >
+            <div className={styles.chatMessageColumn}>
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: message.role === "assistant" ? "flex-start" : "flex-end",
-                  gap: 10,
-                  fontSize: 11,
-                  color: "#64748b",
-                  textTransform: "capitalize",
-                }}
+                className={`${styles.chatMessageMeta} ${
+                  message.role === "assistant" ? styles.chatMessageMetaAssistant : styles.chatMessageMetaUser
+                }`.trim()}
               >
                 <span>{message.role === "assistant" ? "Matcha" : "You"}</span>
               </div>
               <div
-                style={{
-                  borderRadius: message.role === "assistant" ? "20px 20px 20px 8px" : "20px 20px 8px 20px",
-                  padding: "13px 15px",
-                  background:
-                    message.role === "assistant"
-                      ? "#ffffff"
-                      : "linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft))",
-                  color: message.role === "assistant" ? "var(--color-text-primary)" : "#ffffff",
-                  border:
-                    message.role === "assistant"
-                      ? "1px solid rgba(15, 23, 42, 0.08)"
-                      : "1px solid transparent",
-                  boxShadow:
-                    message.role === "assistant"
-                      ? "0 6px 18px rgba(15, 23, 42, 0.06)"
-                      : "0 10px 24px rgba(147, 73, 55, 0.18)",
-                }}
+                className={`${styles.chatBubble} ${
+                  message.role === "assistant" ? styles.chatBubbleAssistant : styles.chatBubbleUser
+                }`.trim()}
               >
-                <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{message.text}</p>
+                <p className={styles.chatBubbleText}>{message.text}</p>
               </div>
             </div>
           </article>
         ))}
         {pendingAssistantMessage ? (
-          <article
-            style={{
-              display: "grid",
-              justifyItems: "start",
-            }}
-          >
-            <div
-              style={{
-                width: "min(100%, 640px)",
-                display: "grid",
-                gap: 6,
-              }}
-            >
+          <article className={`${styles.chatMessage} ${styles.chatMessageAssistant}`.trim()}>
+            <div className={styles.chatMessageColumn}>
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-start",
-                  gap: 10,
-                  fontSize: 11,
-                  color: "#64748b",
-                  textTransform: "capitalize",
-                }}
+                className={`${styles.chatMessageMeta} ${styles.chatMessageMetaAssistant}`.trim()}
               >
                 <span>Matcha</span>
               </div>
-              <div
-                style={{
-                  borderRadius: "20px 20px 20px 8px",
-                  padding: "13px 15px",
-                  background: "#ffffff",
-                  color: "var(--color-text-primary)",
-                  border: "1px solid rgba(15, 23, 42, 0.08)",
-                  boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
-                }}
-              >
-                <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                  {pendingAssistantMessage}
-                </p>
+              <div className={`${styles.chatBubble} ${styles.chatBubbleAssistant}`.trim()}>
+                <p className={styles.chatBubbleText}>{pendingAssistantMessage}</p>
               </div>
             </div>
           </article>
