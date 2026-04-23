@@ -153,6 +153,32 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
               </Link>
             );
           })}
+
+          <div className={styles.drawerSectionLabel}>Account</div>
+          <Link
+            className={
+              pathname === "/dashboard/profile"
+                ? styles.drawerItemActive
+                : styles.drawerItem
+            }
+            href="/dashboard/profile"
+            onClick={onClose}
+          >
+            <span aria-hidden="true">◎</span>
+            <span>Profile</span>
+          </Link>
+          <Link
+            className={
+              pathname === "/dashboard/settings"
+                ? styles.drawerItemActive
+                : styles.drawerItem
+            }
+            href="/dashboard/settings"
+            onClick={onClose}
+          >
+            <span aria-hidden="true">⚙</span>
+            <span>Settings</span>
+          </Link>
         </nav>
       </aside>
     </>
