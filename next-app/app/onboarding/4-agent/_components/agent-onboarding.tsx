@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import styles from "../../_shared/onboarding-shell.module.scss";
@@ -12,8 +12,13 @@ import { upsertUserAgentProfile } from "@/lib/supabase/user-agent-profile";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import type {
   CreateInitialAgentTurnResponse,
-  SubmitAgentTurnResponse,
 } from "../_lib/agent-api-types";
+import {
+  getCappedStatus,
+  isCreateInitialAgentTurnResponse,
+  MAX_AGENT_TURNS,
+  readStreamedAgentTurn,
+} from "../_lib/agent-chat-client";
 import {
   hasAgentDraftContent,
   persistAgentStateToIdb,
@@ -22,88 +27,17 @@ import {
 import { buildDraftSummary, createTranscriptItem } from "../_lib/agent-orchestrator";
 import { readAgentPromptSettings, readTestingCriteriaDefinitions } from "../_lib/agent-storage";
 import type { AgentOnboardingState, AgentConversationMode } from "../_lib/agent-types";
+import { useAgentSpeechPlayback } from "../_lib/use-agent-speech-playback";
 import { AgentLayout } from "./agent-layout";
 import { AgentSummaryCard } from "./agent-summary-card";
 import { ChatPanel } from "./chat-panel";
 import { CompletionReview } from "./completion-review";
-
-function isSubmitAgentTurnResponse(
-  payload: SubmitAgentTurnResponse | { error?: string },
-): payload is SubmitAgentTurnResponse {
-  return (
-    "criteria" in payload &&
-    "assistantMessage" in payload &&
-    "draftSummary" in payload &&
-    "status" in payload
-  );
-}
-
-function isCreateInitialAgentTurnResponse(
-  payload: CreateInitialAgentTurnResponse | { error?: string },
-): payload is CreateInitialAgentTurnResponse {
-  return (
-    "assistantMessage" in payload &&
-    "draftSummary" in payload &&
-    "status" in payload
-  );
-}
-
-type StreamedAgentTurnEvent =
-  | {
-      type: "assistant.delta";
-      delta: string;
-    }
-  | {
-      type: "assistant.done";
-      payload: SubmitAgentTurnResponse;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
 
 type PendingVoiceDraft = {
   blob: Blob;
   url: string;
   error: string;
 };
-
-const MAX_AGENT_TURNS = 20;
-
-function getCappedStatus(
-  turnCount: number,
-  status: AgentOnboardingState["status"],
-): AgentOnboardingState["status"] {
-  return turnCount >= MAX_AGENT_TURNS ? "confirming" : status;
-}
-
-function findSpeakableBoundary(text: string, isFinal: boolean) {
-  if (isFinal) {
-    return text.length;
-  }
-
-  const sentenceMatches = [...text.matchAll(/[.!?]\s/g)];
-
-  if (sentenceMatches.length > 0) {
-    const lastMatch = sentenceMatches.at(-1);
-
-    if (lastMatch?.index !== undefined && lastMatch.index + 2 >= 24) {
-      return lastMatch.index + 2;
-    }
-  }
-
-  const commaMatches = [...text.matchAll(/[,;:]\s/g)];
-
-  if (commaMatches.length > 0) {
-    const lastMatch = commaMatches.at(-1);
-
-    if (lastMatch?.index !== undefined && lastMatch.index + 2 >= 80) {
-      return lastMatch.index + 2;
-    }
-  }
-
-  return 0;
-}
 
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
@@ -156,63 +90,10 @@ function AgentOnboardingClient() {
     }),
     [draft, promptSettings.interviewerSystemPrompt],
   );
-  const queuedSpeechLengthRef = useRef(0);
-
-  const cancelSpeech = useCallback(() => {
-    queuedSpeechLengthRef.current = 0;
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  }, []);
-
-  const queueSpeechFromText = useCallback(
-    (text: string, isFinal: boolean) => {
-      if (
-        draft.selectedMode !== "voice" ||
-        isSpeechMuted ||
-        typeof window === "undefined" ||
-        !("speechSynthesis" in window)
-      ) {
-        return;
-      }
-
-      while (queuedSpeechLengthRef.current < text.length) {
-        const remaining = text.slice(queuedSpeechLengthRef.current);
-        const boundary = findSpeakableBoundary(remaining, isFinal);
-
-        if (boundary <= 0) {
-          break;
-        }
-
-        const rawSegment = remaining.slice(0, boundary);
-        queuedSpeechLengthRef.current += boundary;
-        const segment = rawSegment.replace(/\s+/g, " ").trim();
-
-        if (!segment) {
-          continue;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(segment);
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        window.speechSynthesis.speak(utterance);
-      }
-    },
-    [draft.selectedMode, isSpeechMuted],
-  );
-
-  useEffect(() => {
-    return () => {
-      cancelSpeech();
-    };
-  }, [cancelSpeech]);
-
-  useEffect(() => {
-    if (isSpeechMuted) {
-      cancelSpeech();
-    }
-  }, [cancelSpeech, isSpeechMuted]);
+  const { cancelSpeech, queueSpeechFromText } = useAgentSpeechPlayback({
+    enabled: draft.selectedMode === "voice",
+    muted: isSpeechMuted,
+  });
 
   useEffect(() => {
     return () => {
@@ -418,56 +299,15 @@ function AgentOnboardingClient() {
           throw new Error(payload.error || "The streamed agent turn request failed.");
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let completedPayload: SubmitAgentTurnResponse | null = null;
         let streamedAssistantMessage = "";
-
-        while (true) {
-          const { done, value: chunk } = await reader.read();
-
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(chunk, { stream: true });
-          const events = buffer.split("\n\n");
-          buffer = events.pop() ?? "";
-
-          for (const event of events) {
-            const line = event
-              .split("\n")
-              .map((entry) => entry.trim())
-              .find((entry) => entry.startsWith("data:"));
-
-            if (!line) {
-              continue;
-            }
-
-            const parsed = JSON.parse(line.slice("data:".length).trim()) as StreamedAgentTurnEvent;
-
-            if (parsed.type === "assistant.delta") {
-              streamedAssistantMessage += parsed.delta;
-              setPendingAssistantMessage(streamedAssistantMessage);
-              queueSpeechFromText(streamedAssistantMessage, false);
-              continue;
-            }
-
-            if (parsed.type === "assistant.done") {
-              completedPayload = parsed.payload;
-              continue;
-            }
-
-            if (parsed.type === "error") {
-              throw new Error(parsed.message);
-            }
-          }
-        }
-
-        if (!completedPayload || !isSubmitAgentTurnResponse(completedPayload)) {
-          throw new Error("The streamed agent turn finished without a valid completion payload.");
-        }
+        const completedPayload = await readStreamedAgentTurn({
+          response,
+          onDelta: (delta) => {
+            streamedAssistantMessage += delta;
+            setPendingAssistantMessage(streamedAssistantMessage);
+            queueSpeechFromText(streamedAssistantMessage, false);
+          },
+        });
 
         const assistantText = completedPayload.assistantMessage || streamedAssistantMessage;
         queueSpeechFromText(assistantText, true);

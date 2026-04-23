@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { assertLlmConfigured } from "@/lib/llm/env";
+import { assertOpenAiApiEnv } from "@/lib/openai-realtime/env";
 
 export const runtime = "nodejs";
 
@@ -17,13 +17,13 @@ export async function POST(request: Request) {
       return jsonError("A voice note file is required.");
     }
 
-    const env = assertLlmConfigured();
+    const env = assertOpenAiApiEnv();
     const upstreamFormData = new FormData();
     upstreamFormData.append("file", audioFile, audioFile.name || "voice-note.webm");
     upstreamFormData.append("model", "gpt-4o-transcribe");
     upstreamFormData.append("language", "en");
 
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/audio/transcriptions`, {
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.apiKey}`,

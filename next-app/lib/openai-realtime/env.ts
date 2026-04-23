@@ -19,6 +19,22 @@ export function getOpenAiRealtimeEnv() {
   };
 }
 
+export function getOpenAiApiEnv() {
+  return {
+    apiKey: readEnv("OPENAI_API_KEY"),
+  };
+}
+
+export function assertOpenAiApiEnv() {
+  const env = getOpenAiApiEnv();
+
+  if (!env.apiKey) {
+    throw new Error("Missing OPENAI_API_KEY for OpenAI audio features.");
+  }
+
+  return env;
+}
+
 export function assertOpenAiRealtimeEnv() {
   const env = getOpenAiRealtimeEnv();
 
