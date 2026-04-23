@@ -264,6 +264,12 @@
   white-space: nowrap;
 }
 
+.drawerEmptyText {
+  padding: 10px 14px;
+  color: var(--color-text-tertiary);
+  font-size: 0.9rem;
+}
+
 .unreadDot {
   flex: 0 0 auto;
   width: 8px;
@@ -394,6 +400,8 @@
 }
 
 .matchPhoto {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   min-height: 360px;

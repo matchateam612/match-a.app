@@ -2,15 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-api";
 import styles from "../page.module.scss";
-
-const matchThreads = [
-  { id: "annie", label: "Annie", unread: true },
-  { id: "sunny", label: "Sunny", unread: true },
-  { id: "cherry", label: "Cherry", unread: true },
-] as const;
 
 const agentThreads = [
   { id: "tonight-plans", label: "Tonight plans" },
@@ -26,6 +21,34 @@ type DashboardDrawerProps = {
 export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
   const pathname = usePathname();
   const [areMatchesOpen, setAreMatchesOpen] = useState(true);
+  const [matchThreads, setMatchThreads] = useState<MatchThread[]>([]);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMatchThreads() {
+      try {
+        const response = await listMatchThreadsRequest();
+
+        if (isMounted) {
+          setMatchThreads(response.threads);
+          setIsLoadingMatches(false);
+        }
+      } catch {
+        if (isMounted) {
+          setMatchThreads([]);
+          setIsLoadingMatches(false);
+        }
+      }
+    }
+
+    void loadMatchThreads();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <>
@@ -72,12 +95,14 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
               <span aria-hidden="true">♡</span>
               <span>Matches</span>
             </span>
-            <span className={styles.drawerCount}>{matchThreads.length}</span>
+            <span className={styles.drawerCount}>
+              {isLoadingMatches ? "…" : matchThreads.length}
+            </span>
           </button>
 
           {areMatchesOpen ? (
             <div className={styles.drawerSubList}>
-              {matchThreads.map((thread) => {
+              {matchThreads.length > 0 ? matchThreads.map((thread) => {
                 const href = `/dashboard/matches/${thread.id}`;
                 const isActive = pathname === href;
 
@@ -101,7 +126,11 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
                     ) : null}
                   </Link>
                 );
-              })}
+              }) : (
+                <span className={styles.drawerEmptyText}>
+                  {isLoadingMatches ? "Loading matches..." : "No matches yet"}
+                </span>
+              )}
             </div>
           ) : null}
 
