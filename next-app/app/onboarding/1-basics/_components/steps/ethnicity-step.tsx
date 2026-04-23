@@ -18,71 +18,63 @@ export function EthnicityStep({
   onPreferredEthnicityToggle,
 }: EthnicityStepProps) {
   return (
-    <>
+    <div className={styles.fieldStack}>
       <div className={styles.questionMeta}>
         <p className={styles.questionLabel}>Ethnicity</p>
-        <h2 className={styles.questionTitle}>
-          Tell us about your background and who you are open to meeting.
-        </h2>
+        <h2 className={styles.questionTitle}>Background and match preferences.</h2>
         <p className={styles.questionCopy}>
-          This helps with profile display and preference-based matching. You can keep your own
-          background private if you want.
+          Keep it quick: choose your own background, then tap the groups you want included in
+          matching.
         </p>
       </div>
 
-      <div className={styles.splitCard}>
-        <div className={styles.stackCard}>
-          <label className={styles.fieldStack}>
-            <span className={styles.inlineLabel}>
-              Which option is closest to your ethnicity or racial background?
-            </span>
-            <select
-              className={styles.selectInput}
-              value={ethnicity}
-              onChange={(event) => onEthnicityChange(event.target.value as EthnicityOption)}
+      <div className={styles.compactSection}>
+        <span className={styles.inlineLabel}>Your background</span>
+        <div className={styles.compactChoiceGrid}>
+          {ethnicityOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`${styles.compactChoice} ${
+                ethnicity === option.value ? styles.compactChoiceActive : ""
+              }`.trim()}
+              aria-pressed={ethnicity === option.value}
+              onClick={() => onEthnicityChange(option.value as EthnicityOption)}
             >
-              <option value="">Select one</option>
-              {ethnicityOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className={styles.stackCard}>
-          <label className={styles.fieldStack}>
-            <span className={styles.inlineLabel}>Who are you open to meeting?</span>
-          </label>
-
-          <div className={styles.selectionSummary}>{selectedEthnicitySummary}</div>
-
-          <div className={styles.multiGrid}>
-            {preferredEthnicityOptions.map((option) => {
-              const isSelected = preferredEthnicities.includes(option.value);
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`${styles.multiChip} ${isSelected ? styles.multiChipActive : ""}`.trim()}
-                  aria-pressed={isSelected}
-                  onClick={() => onPreferredEthnicityToggle(option.value)}
-                >
-                  <span className={styles.chipTitle}>{option.title}</span>
-                  <span className={styles.chipCopy}>{option.copy}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className={styles.helper}>
-            Select as many as you want. Choose <strong>Any race</strong> if you do not want this
-            preference to narrow your matches.
-          </p>
+              {option.title}
+            </button>
+          ))}
         </div>
       </div>
-    </>
+
+      <div className={styles.compactSection}>
+        <div className={styles.rowBetween}>
+          <span className={styles.inlineLabel}>Open to meeting</span>
+          <div className={styles.selectionSummary}>{selectedEthnicitySummary}</div>
+        </div>
+
+        <div className={styles.compactChoiceGrid}>
+          {preferredEthnicityOptions.map((option) => {
+            const isSelected = preferredEthnicities.includes(option.value);
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.compactChoice} ${
+                  isSelected ? styles.compactChoiceActive : ""
+                }`.trim()}
+                aria-pressed={isSelected}
+                onClick={() => onPreferredEthnicityToggle(option.value)}
+              >
+                {option.title}
+              </button>
+            );
+          })}
+        </div>
+
+        <p className={styles.helper}>Choose as many as you want, or tap Any race to stay open.</p>
+      </div>
+    </div>
   );
 }

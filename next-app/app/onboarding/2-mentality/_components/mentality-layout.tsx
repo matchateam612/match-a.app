@@ -36,35 +36,17 @@ export function MentalityLayout({
 
       <main className={styles.main}>
         <div className={styles.layout}>
-          <section className={styles.heroCard}>
-            <div className={styles.heroContent}>
-              <span className={styles.eyebrow}>
-                <span className={styles.eyebrowDot} />
-                Section 2 of {TOTAL_SECTIONS}
-              </span>
-
-              <div>
-                <h1 className={styles.heroTitle}>
-                  Shape the <span className={styles.heroHighlight}>intent</span> behind each
-                  match.
-                </h1>
-                <p className={styles.heroCopy}>
-                  These answers guide how we branch your onboarding, interpret compatibility, and
-                  keep your recommendations aligned with the kind of connection you want.
+          <section className={styles.panelCard}>
+            <div className={styles.panelHeader}>
+              <div className={styles.questionMeta}>
+                <span className={styles.questionLabel}>Section 2 of {TOTAL_SECTIONS}</span>
+                <h1 className={styles.questionTitle}>Shape the intent behind each match.</h1>
+                <p className={styles.questionCopy}>
+                  These answers guide branching and keep recommendations aligned with the kind of
+                  connection you want.
                 </p>
               </div>
 
-              <div className={styles.heroBadges}>
-                <div className={styles.heroBadge}>Branch-aware resume on this device</div>
-                <div className={`${styles.heroBadge} ${styles.heroBadgeAccent}`}>
-                  Different questions for different intentions
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.panelCard}>
-            <div className={styles.panelHeader}>
               <div className={styles.progressMeta}>
                 <span>
                   Step {currentStepIndex + 1} of {totalSteps}

@@ -21,131 +21,72 @@ export function PictureGalleryCard({
   onDeleteClick,
 }: PictureGalleryCardProps) {
   const filledSlots = slots.filter((slot) => slot.path);
-  const emptySlots = slots.filter((slot) => !slot.path);
-  const featuredSlots = [...filledSlots, ...emptySlots].slice(0, 4);
-  const remainingSlots = slots.slice(4);
-  const hasRemainingSlots = remainingSlots.length > 0;
+  const nextAvailableSlot = slots.find((slot) => !slot.path)?.slot ?? null;
 
   return (
     <div className={styles.stackCard}>
       <span className={styles.inlineLabel}>More photos</span>
       <p className={styles.helper}>
-        Add up to {MAX_GALLERY_PHOTOS} extra photos to round out your profile. Start with a few
-        strong ones, then add more if you want.
+        Add up to {MAX_GALLERY_PHOTOS} extra photos. The next empty slot shows a plus button, and
+        the rest stay blank until you need them.
       </p>
       <div className={pictureStyles.galleryOverview}>
         <div className={styles.selectionSummary}>
           {filledSlots.length} of {MAX_GALLERY_PHOTOS} added
         </div>
-        <p className={styles.helper}>
-          Your first few photos stay front and center so this screen feels lighter on phones.
-        </p>
       </div>
       {isLoading ? <p className={styles.helper}>Loading your saved extra photos...</p> : null}
       <div className={pictureStyles.galleryGrid}>
-        {featuredSlots.map((slot) => (
+        {slots.map((slot) => (
           <div key={slot.slot} className={pictureStyles.gallerySlot}>
-            <div className={pictureStyles.gallerySlotHeader}>
-              <span className={styles.helper}>Photo {slot.slot}</span>
-              <span className={styles.helper}>{slot.path ? "Saved" : "Empty"}</span>
-            </div>
-
             {slot.previewUrl ? (
-              <Image
-                src={slot.previewUrl}
-                alt={`Gallery photo slot ${slot.slot}`}
-                width={300}
-                height={400}
-                unoptimized
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  borderRadius: "16px",
-                  aspectRatio: "3 / 4",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              <div className={pictureStyles.galleryEmpty}>Choose a photo for this slot</div>
-            )}
-
-            <div className={pictureStyles.galleryActions}>
               <button
-                className={styles.nextButton}
+                className={pictureStyles.galleryFilledButton}
                 type="button"
                 onClick={() => onUploadClick(slot.slot)}
                 disabled={disabled || isLoading || slot.isUploading || slot.isDeleting}
+                aria-label={`Replace photo ${slot.slot}`}
               >
-                {slot.isUploading ? "Uploading..." : slot.path ? "Replace photo" : "Upload photo"}
+                <Image
+                  src={slot.previewUrl}
+                  alt={`Gallery photo slot ${slot.slot}`}
+                  width={180}
+                  height={180}
+                  unoptimized
+                  className={pictureStyles.galleryImage}
+                />
+                <span className={pictureStyles.gallerySlotBadge}>
+                  {slot.isUploading ? "..." : slot.slot}
+                </span>
               </button>
+            ) : nextAvailableSlot === slot.slot ? (
               <button
-                className={styles.backButton}
+                className={pictureStyles.galleryAddButton}
+                type="button"
+                onClick={() => onUploadClick(slot.slot)}
+                disabled={disabled || isLoading || slot.isUploading || slot.isDeleting}
+                aria-label={`Add photo ${slot.slot}`}
+              >
+                <span className={pictureStyles.galleryPlus}>+</span>
+              </button>
+            ) : (
+              <div className={pictureStyles.galleryEmpty} aria-hidden="true" />
+            )}
+
+            {slot.path ? (
+              <button
+                className={pictureStyles.galleryRemoveButton}
                 type="button"
                 onClick={() => onDeleteClick(slot.slot)}
-                disabled={disabled || isLoading || slot.isUploading || slot.isDeleting || !slot.path}
+                disabled={disabled || isLoading || slot.isUploading || slot.isDeleting}
+                aria-label={`Remove photo ${slot.slot}`}
               >
-                {slot.isDeleting ? "Removing..." : "Remove photo"}
+                {slot.isDeleting ? "..." : "×"}
               </button>
-            </div>
+            ) : null}
           </div>
         ))}
       </div>
-
-      {hasRemainingSlots ? (
-        <details className={pictureStyles.galleryMore}>
-          <summary className={pictureStyles.galleryMoreSummary}>
-            Manage all {MAX_GALLERY_PHOTOS} slots
-          </summary>
-          <div className={pictureStyles.galleryGridExpanded}>
-            {remainingSlots.map((slot) => (
-              <div key={slot.slot} className={pictureStyles.gallerySlot}>
-                <div className={pictureStyles.gallerySlotHeader}>
-                  <span className={styles.helper}>Photo {slot.slot}</span>
-                  <span className={styles.helper}>{slot.path ? "Saved" : "Empty"}</span>
-                </div>
-
-                {slot.previewUrl ? (
-                  <Image
-                    src={slot.previewUrl}
-                    alt={`Gallery photo slot ${slot.slot}`}
-                    width={300}
-                    height={400}
-                    unoptimized
-                    style={{
-                      width: "100%",
-                      height: "auto",
-                      borderRadius: "16px",
-                      aspectRatio: "3 / 4",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <div className={pictureStyles.galleryEmpty}>Choose a photo for this slot</div>
-                )}
-
-                <div className={pictureStyles.galleryActions}>
-                  <button
-                    className={styles.nextButton}
-                    type="button"
-                    onClick={() => onUploadClick(slot.slot)}
-                    disabled={disabled || isLoading || slot.isUploading || slot.isDeleting}
-                  >
-                    {slot.isUploading ? "Uploading..." : slot.path ? "Replace photo" : "Upload photo"}
-                  </button>
-                  <button
-                    className={styles.backButton}
-                    type="button"
-                    onClick={() => onDeleteClick(slot.slot)}
-                    disabled={disabled || isLoading || slot.isUploading || slot.isDeleting || !slot.path}
-                  >
-                    {slot.isDeleting ? "Removing..." : "Remove photo"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }
