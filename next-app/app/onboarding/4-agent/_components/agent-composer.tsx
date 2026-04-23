@@ -247,17 +247,17 @@ export function AgentComposer({
           <textarea
             className={styles.input}
             value={value}
-            rows={3}
+            rows={2}
             disabled={disabled}
             placeholder={disabled ? "The agent is thinking..." : "Message the onboarding agent..."}
             onChange={(event) => setValue(event.target.value)}
             style={{
-              minHeight: 96,
+              minHeight: 82,
               resize: "none",
               borderRadius: 18,
               background: "#f8fafc",
-              paddingTop: 18,
-              paddingBottom: 18,
+              paddingTop: 16,
+              paddingBottom: 16,
             }}
           />
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
@@ -289,7 +289,7 @@ export function AgentComposer({
           <div
             style={{
               display: "grid",
-              gap: 10,
+              gap: 8,
               justifyItems: "center",
               padding: "8px 0 2px",
             }}
@@ -322,9 +322,9 @@ export function AgentComposer({
               }}
               className={styles.nextButton}
               style={{
-                width: 110,
-                minWidth: 110,
-                minHeight: 110,
+                width: 82,
+                minWidth: 82,
+                minHeight: 82,
                 borderRadius: 999,
                 display: "grid",
                 placeItems: "center",
@@ -353,7 +353,7 @@ export function AgentComposer({
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
             <p className={styles.helper} style={{ margin: 0 }}>
-              Voice notes are sent after you release.
+              Release to send.
             </p>
             <button
               type="button"

@@ -53,36 +53,34 @@ export function EthnicityStep({
 
         <div className={styles.stackCard}>
           <label className={styles.fieldStack}>
-            <span className={styles.inlineLabel}>
-              Which ethnicities or races are you open to meeting?
-            </span>
-            <select
-              className={`${styles.selectInput} ${styles.multiSelect}`.trim()}
-              multiple
-              value={preferredEthnicities}
-              onChange={(event) => {
-                const values = Array.from(event.target.selectedOptions, (option) => option.value);
-
-                preferredEthnicityOptions.forEach((option) => {
-                  const shouldBeSelected = values.includes(option.value);
-                  const isSelected = preferredEthnicities.includes(option.value);
-
-                  if (shouldBeSelected !== isSelected) {
-                    onPreferredEthnicityToggle(option.value);
-                  }
-                });
-              }}
-            >
-              {preferredEthnicityOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.title}
-                </option>
-              ))}
-            </select>
+            <span className={styles.inlineLabel}>Who are you open to meeting?</span>
           </label>
 
           <div className={styles.selectionSummary}>{selectedEthnicitySummary}</div>
-          <p className={styles.helper}>Hold Ctrl or Cmd to select more than one option.</p>
+
+          <div className={styles.multiGrid}>
+            {preferredEthnicityOptions.map((option) => {
+              const isSelected = preferredEthnicities.includes(option.value);
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.multiChip} ${isSelected ? styles.multiChipActive : ""}`.trim()}
+                  aria-pressed={isSelected}
+                  onClick={() => onPreferredEthnicityToggle(option.value)}
+                >
+                  <span className={styles.chipTitle}>{option.title}</span>
+                  <span className={styles.chipCopy}>{option.copy}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className={styles.helper}>
+            Select as many as you want. Choose <strong>Any race</strong> if you do not want this
+            preference to narrow your matches.
+          </p>
         </div>
       </div>
     </>

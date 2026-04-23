@@ -17,7 +17,7 @@ export function TranscriptMessageList({
       <div
         className={styles.stackCard}
         style={{
-          minHeight: 420,
+          minHeight: 240,
           alignContent: "center",
           background: "linear-gradient(180deg, #f8fafc, #ffffff)",
           border: "1px solid rgba(15, 23, 42, 0.08)",
@@ -37,14 +37,14 @@ export function TranscriptMessageList({
     <div
       className={styles.stackCard}
       style={{
-        minHeight: 420,
-        gap: 14,
+        minHeight: 260,
+        gap: 12,
         background: "linear-gradient(180deg, #f8fafc, #ffffff)",
         border: "1px solid rgba(15, 23, 42, 0.08)",
       }}
     >
       <span className={styles.inlineLabel}>Conversation</span>
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 12 }}>
         {transcript.map((message) => (
           <article
             key={message.id}
@@ -65,20 +65,17 @@ export function TranscriptMessageList({
                   display: "flex",
                   justifyContent: message.role === "assistant" ? "flex-start" : "flex-end",
                   gap: 10,
-                  fontSize: 12,
+                  fontSize: 11,
                   color: "#64748b",
                   textTransform: "capitalize",
                 }}
               >
-                <span>
-                  {message.role} · {message.modality}
-                </span>
-                <span>{new Date(message.createdAt).toLocaleTimeString()}</span>
+                <span>{message.role === "assistant" ? "Matcha" : "You"}</span>
               </div>
               <div
                 style={{
                   borderRadius: message.role === "assistant" ? "20px 20px 20px 8px" : "20px 20px 8px 20px",
-                  padding: "14px 16px",
+                  padding: "13px 15px",
                   background:
                     message.role === "assistant"
                       ? "#ffffff"
@@ -118,18 +115,17 @@ export function TranscriptMessageList({
                   display: "flex",
                   justifyContent: "flex-start",
                   gap: 10,
-                  fontSize: 12,
+                  fontSize: 11,
                   color: "#64748b",
                   textTransform: "capitalize",
                 }}
               >
-                <span>assistant · streaming</span>
-                <span>{new Date().toLocaleTimeString()}</span>
+                <span>Matcha</span>
               </div>
               <div
                 style={{
                   borderRadius: "20px 20px 20px 8px",
-                  padding: "14px 16px",
+                  padding: "13px 15px",
                   background: "#ffffff",
                   color: "var(--color-text-primary)",
                   border: "1px solid rgba(15, 23, 42, 0.08)",
