@@ -22,6 +22,10 @@ export function OnboardingRouteGuard({ area, children }: RouteGuardProps) {
   useEffect(() => {
     let isActive = true;
 
+    function isAllowedOnboardingPath(path: string, nextRoute: string) {
+      return path === nextRoute || path.startsWith(`${nextRoute}/`);
+    }
+
     async function checkAccess() {
       try {
         const user = await getCurrentUser();
@@ -44,7 +48,7 @@ export function OnboardingRouteGuard({ area, children }: RouteGuardProps) {
             router.replace(nextRoute);
             return;
           }
-        } else if (pathname !== nextRoute) {
+        } else if (!isAllowedOnboardingPath(pathname, nextRoute)) {
           router.replace(nextRoute);
           return;
         }
