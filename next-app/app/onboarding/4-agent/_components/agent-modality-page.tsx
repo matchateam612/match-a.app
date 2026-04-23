@@ -72,42 +72,55 @@ function AgentModalityPageClient() {
 
   const onSelectMode = useCallback(
     async (mode: AgentConversationMode) => {
-      if (isSelecting) {
+      if (isSelecting || isHydrating) {
         return;
       }
 
       setSaveError("");
-      setSaveMessage(mode === "voice" ? "Opening voice-first chat..." : "Opening text-first chat...");
-      setIsSelecting(true);
-
-      try {
-        const storedState = await readStoredAgentStateFromIdb(criteriaDefinitions, promptSettings);
-        const nextDraft = {
-          ...storedState.draft,
-          selectedMode: mode,
-        };
-        const nextProgress = nextDraft.status;
-
-        await persistAgentStateToIdb({
-          draft: nextDraft,
-          progress: nextProgress,
-          promptSettings,
-          criteriaDefinitions,
-        });
-
-        setSelectedMode(mode);
-        router.push("/onboarding/4-agent/chat");
-      } catch (error) {
-        setSaveMessage("");
-        setSaveError(
-          error instanceof Error ? error.message : "We couldn't save your selected conversation style.",
-        );
-      } finally {
-        setIsSelecting(false);
-      }
+      setSaveMessage(
+        mode === "voice"
+          ? "Voice-first is selected. Continue when you're ready."
+          : "Text-first is selected. Continue when you're ready.",
+      );
+      setSelectedMode(mode);
     },
-    [criteriaDefinitions, isSelecting, promptSettings, router],
+    [isHydrating, isSelecting],
   );
+
+  const continueToChat = useCallback(async () => {
+    if (!selectedMode || isSelecting || isHydrating) {
+      return;
+    }
+
+    setSaveError("");
+    setSaveMessage(selectedMode === "voice" ? "Opening voice-first chat..." : "Opening text-first chat...");
+    setIsSelecting(true);
+
+    try {
+      const storedState = await readStoredAgentStateFromIdb(criteriaDefinitions, promptSettings);
+      const nextDraft = {
+        ...storedState.draft,
+        selectedMode,
+      };
+      const nextProgress = nextDraft.status;
+
+      await persistAgentStateToIdb({
+        draft: nextDraft,
+        progress: nextProgress,
+        promptSettings,
+        criteriaDefinitions,
+      });
+
+      router.push("/onboarding/4-agent/chat");
+    } catch (error) {
+      setSaveMessage("");
+      setSaveError(
+        error instanceof Error ? error.message : "We couldn't save your selected conversation style.",
+      );
+    } finally {
+      setIsSelecting(false);
+    }
+  }, [criteriaDefinitions, isHydrating, isSelecting, promptSettings, router, selectedMode]);
 
   return (
     <AgentLayout
@@ -123,14 +136,24 @@ function AgentModalityPageClient() {
         />
       }
       footer={
-        <button
-          className={styles.backButton}
-          type="button"
-          onClick={() => router.push("/onboarding/3-picture")}
-          disabled={isHydrating || isSelecting}
-        >
-          Back
-        </button>
+        <>
+          <button
+            className={styles.backButton}
+            type="button"
+            onClick={() => router.push("/onboarding/3-picture")}
+            disabled={isHydrating || isSelecting}
+          >
+            Back
+          </button>
+          <button
+            className={styles.nextButton}
+            type="button"
+            onClick={() => void continueToChat()}
+            disabled={!selectedMode || isHydrating || isSelecting}
+          >
+            {isSelecting ? "Starting..." : "Start chat"}
+          </button>
+        </>
       }
     >
       <div className={styles.stackCard}>

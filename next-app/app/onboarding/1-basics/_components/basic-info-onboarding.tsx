@@ -250,11 +250,11 @@ function BasicInfoOnboardingClient() {
       } catch (error) {
         throw new Error(
           error instanceof Error && error.message
-            ? `Basic info saved to user_basic_info, but user_matches_info could not be updated: ${error.message}`
-            : "Basic info saved to user_basic_info, but user_matches_info could not be updated.",
+            ? `Your basics were saved, but we could not finish syncing them yet: ${error.message}`
+            : "Your basics were saved, but we could not finish syncing them yet.",
         );
       }
-      setSaveMessage("Basic info saved to user_basic_info.");
+      setSaveMessage("Your basics are saved.");
       router.push("/onboarding/2-mentality");
     } catch (error) {
       setSaveError(

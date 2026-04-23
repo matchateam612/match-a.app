@@ -16,7 +16,7 @@ import { upsertUserMentality } from "@/lib/supabase/user-mentality";
 import {
   initialDraft,
 } from "./mentality-data";
-import { getFirstBranchStepId, getMentalityFlow } from "./mentality-flow";
+import { getMentalityFlow } from "./mentality-flow";
 import {
   hasMentalityDraftContent,
   initialProgress,
@@ -58,8 +58,8 @@ function applyRelationshipIntentChange(
     draft: nextDraft,
     progress: {
       branch: nextIntent,
-      currentStepId: getFirstBranchStepId(nextIntent),
-      completedStepIds: ["relationship_intent"],
+      currentStepId: "relationship_intent",
+      completedStepIds: [],
     },
   };
 }
@@ -233,7 +233,7 @@ function MentalityOnboardingClient() {
         mentalityProgress: finalProgress,
       });
       setProgress(finalProgress);
-      setSaveMessage("Mentality answers saved to user_mentality.");
+      setSaveMessage("Your dating intentions are saved.");
       router.push("/onboarding/3-picture");
     } catch (error) {
       setSaveError(

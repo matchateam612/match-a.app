@@ -156,8 +156,8 @@ function AgentOnboardingClient() {
     }
 
     return hasSavedDraft
-      ? "Saved locally in IndexedDB on this device as you go."
-      : "Your agent conversation will be saved locally in IndexedDB on this device.";
+      ? "Saved on this device as you go."
+      : "Your agent conversation will be saved on this device.";
   }, [hasSavedDraft, isHydrating]);
 
   const ensureInitialAssistantTurn = useCallback(async () => {
@@ -403,7 +403,7 @@ function AgentOnboardingClient() {
 
         setPendingVoiceDraft(nextDraft);
         setSaveError("");
-        setSaveMessage("Voice note saved locally. Retry when you're ready.");
+        setSaveMessage("Voice note saved on this device. Retry when you're ready.");
       }
     },
     [pendingVoiceDraft, submitUserTurn],
@@ -458,7 +458,7 @@ function AgentOnboardingClient() {
         agentSummary: nextDraft.finalSummary ?? draftSummary,
       });
 
-      setSaveMessage("Agent profile saved to user_agent_profile.");
+      setSaveMessage("Your onboarding summary is saved.");
       router.push("/dashboard");
     } catch (error) {
       setSaveError(
@@ -555,7 +555,7 @@ function AgentOnboardingClient() {
             completedAt: new Date().toISOString(),
           }));
           setProgress("complete");
-          setSaveMessage("Conversation confirmed and completed.");
+          setSaveMessage("Conversation confirmed.");
         }}
       />
 
@@ -571,34 +571,37 @@ function AgentOnboardingClient() {
             finalSummary: draftSummary,
           }));
           setProgress("confirming");
-          setSaveMessage("Draft summary applied. The real flow should now ask the user to confirm or correct it.");
+          setSaveMessage("Draft summary applied. Review it before saving.");
         }}
       />
 
-      <div className={styles.stackCard}>
-        <span className={styles.inlineLabel}>Stored schema preview</span>
-        <textarea
-          className={styles.input}
-          value={criteriaJson}
-          readOnly
-          rows={14}
-          style={{ minHeight: 280, fontFamily: "monospace", resize: "vertical" }}
-        />
-        <p className={styles.helper}>
-          This criteria model stays flexible and data-driven. You can expand, rename, or replace criteria later without rewriting the core state shape.
-        </p>
-      </div>
-
-      <div className={styles.stackCard}>
-        <span className={styles.inlineLabel}>Conversation progress</span>
-        <p style={{ marginTop: 0, marginBottom: 8 }}>Session status: {progress}</p>
-        <p style={{ marginTop: 0, marginBottom: 0 }}>Turns so far: {draft.turnCount}</p>
-        {turnLimitReached ? (
-          <p className={styles.helper} style={{ marginTop: 8, marginBottom: 0 }}>
-            The 20-turn limit has been reached, so the current summary is now being used for confirmation.
+      <details className={styles.debugPanel}>
+        <summary className={styles.debugSummary}>Conversation debug view</summary>
+        <div className={styles.debugCard}>
+          <span className={styles.inlineLabel}>Stored criteria JSON</span>
+          <textarea
+            className={styles.input}
+            value={criteriaJson}
+            readOnly
+            rows={14}
+            style={{ minHeight: 280, fontFamily: "monospace", resize: "vertical" }}
+          />
+          <p className={styles.helper}>
+            Use this testing view to inspect the extracted criteria model and tune the conversation logic.
           </p>
-        ) : null}
-      </div>
+        </div>
+
+        <div className={styles.debugCard}>
+          <span className={styles.inlineLabel}>Progress diagnostics</span>
+          <p style={{ marginTop: 0, marginBottom: 8 }}>Session status: {progress}</p>
+          <p style={{ marginTop: 0, marginBottom: 0 }}>Turns so far: {draft.turnCount}</p>
+          {turnLimitReached ? (
+            <p className={styles.helper} style={{ marginTop: 8, marginBottom: 0 }}>
+              The 20-turn limit has been reached, so the current summary is being used for the final review step.
+            </p>
+          ) : null}
+        </div>
+      </details>
     </AgentLayout>
   );
 }

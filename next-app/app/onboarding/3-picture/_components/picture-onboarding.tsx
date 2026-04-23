@@ -182,8 +182,8 @@ function PictureOnboardingClient() {
     }
 
     return hasSavedDraft
-      ? "Saved locally in IndexedDB on this device as you go."
-      : "Your picture draft will be saved locally in IndexedDB on this device.";
+      ? "Saved on this device as you go."
+      : "Your picture draft will be saved on this device.";
   }, [hasSavedDraft, isHydratingMeta]);
 
   const canContinue = useMemo(
@@ -612,8 +612,8 @@ function PictureOnboardingClient() {
         userId: user.id,
         profilePicturePath: getUserPfpPath(user.id),
       });
-      setSaveMessage("Picture saved. Your profile image is ready.");
-      router.push("/onboarding");
+      setSaveMessage("Your main photo is saved.");
+      router.push("/onboarding/4-agent");
     } catch (error) {
       setSaveError(
         error instanceof Error && error.message
@@ -823,8 +823,8 @@ function PictureOnboardingClient() {
                   }}
                 />
                 <p className={styles.helper}>
-                  This prompt is sent with your current image to the AI image converter. If no API
-                  key is configured, the original JPEG is kept.
+                  Describe the kind of cleanup you want, like softer lighting, a more polished
+                  crop, or a cleaner background while still looking like you.
                 </p>
                 <button
                   className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}

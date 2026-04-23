@@ -33,10 +33,10 @@ export function getLocalDraftStatus(hasSavedDraft: boolean, args?: {
   savedDraftStatus?: string;
 }) {
   if (hasSavedDraft) {
-    return args?.savedDraftStatus ?? "Saved locally in IndexedDB on this device as you go.";
+    return args?.savedDraftStatus ?? "Saved on this device as you go.";
   }
 
-  return args?.emptyDraftStatus ?? "Your answers will be saved locally in IndexedDB on this device.";
+  return args?.emptyDraftStatus ?? "Your answers will be saved on this device.";
 }
 
 export function useOnboardingSectionState<

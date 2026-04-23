@@ -29,17 +29,6 @@ export function AgentLayout({
           <div className={styles.panelHeader}>
             <div className={styles.progressMeta}>
               <span className={styles.inlineLabel}>{eyebrow}</span>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Link href="/onboarding/4-agent/testing" className={styles.backButton}>
-                  Testing playground
-                </Link>
-                <Link
-                  href="/onboarding/4-agent/testing/system-prompt"
-                  className={styles.backButton}
-                >
-                  System prompt
-                </Link>
-              </div>
             </div>
 
             <div className={styles.questionMeta}>
@@ -47,6 +36,21 @@ export function AgentLayout({
               <p className={styles.questionCopy}>{description}</p>
               {status}
             </div>
+
+            <details className={styles.debugPanel}>
+              <summary className={styles.debugSummary}>Testing tools</summary>
+              <div className={styles.debugLinks}>
+                <Link href="/onboarding/4-agent/testing" className={styles.backButton}>
+                  Open testing playground
+                </Link>
+                <Link
+                  href="/onboarding/4-agent/testing/system-prompt"
+                  className={styles.backButton}
+                >
+                  Edit system prompt
+                </Link>
+              </div>
+            </details>
           </div>
 
           <div className={styles.questionBlock}>

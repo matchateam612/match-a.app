@@ -16,7 +16,7 @@ export function AgentSummaryCard({ criteria, finalSummary }: AgentSummaryCardPro
     <div className={styles.stackCard}>
       <span className={styles.inlineLabel}>Current summary</span>
       <p style={{ marginTop: 0, marginBottom: 12 }}>
-        {finalSummary ?? "No final summary yet. This scaffold will show a draft summary as criteria fill in."}
+        {finalSummary ?? "We are still building up your summary from the conversation so far."}
       </p>
       <p className={styles.helper} style={{ marginBottom: 16 }}>
         Required confirmed: {completion.confirmedRequiredCount} / {completion.requiredCount}

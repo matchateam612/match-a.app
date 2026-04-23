@@ -13,14 +13,14 @@ export function CompletionReview({
 }: CompletionReviewProps) {
   return (
     <div className={styles.stackCard}>
-      <span className={styles.inlineLabel}>Confirmation flow scaffold</span>
+      <span className={styles.inlineLabel}>Summary review</span>
       <p style={{ marginTop: 0 }}>{draftSummary}</p>
       <p className={styles.helper}>
-        The real implementation should ask the user to confirm or correct this summary before save.
+        Use this draft when you want to move the conversation into the final confirmation step.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button type="button" className={styles.nextButton} onClick={onApplySummary}>
-          Use as final summary
+          Review this summary
         </button>
       </div>
     </div>
