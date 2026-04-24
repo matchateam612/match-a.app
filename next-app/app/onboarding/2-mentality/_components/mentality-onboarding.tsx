@@ -40,32 +40,50 @@ function toggleValue(values: string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }
 
-function getSingleSelectValue(draft: MentalityDraft, questionKey: string) {
-  switch (questionKey) {
-    case "relationshipIntent":
-      return draft.relationshipIntent;
-    case "serious.pace":
-      return draft.serious.pace;
-    case "casual.frequency":
-      return draft.casual.frequency;
-    case "open.style":
-      return draft.open.style;
-    default:
-      return "";
+function getValueAtPath(source: unknown, path: string) {
+  return path.split(".").reduce<unknown>((current, segment) => {
+    if (current && typeof current === "object" && segment in current) {
+      return (current as Record<string, unknown>)[segment];
+    }
+
+    return undefined;
+  }, source);
+}
+
+function setValueAtPath<T extends Record<string, unknown>>(source: T, path: string, value: unknown): T {
+  const segments = path.split(".");
+  const [head, ...tail] = segments;
+
+  if (!head) {
+    return source;
   }
+
+  if (tail.length === 0) {
+    return {
+      ...source,
+      [head]: value,
+    };
+  }
+
+  const nestedSource =
+    source[head] && typeof source[head] === "object" && !Array.isArray(source[head])
+      ? (source[head] as Record<string, unknown>)
+      : {};
+
+  return {
+    ...source,
+    [head]: setValueAtPath(nestedSource, tail.join("."), value),
+  };
+}
+
+function getSingleSelectValue(draft: MentalityDraft, questionKey: string) {
+  const value = getValueAtPath(draft, questionKey);
+  return typeof value === "string" ? value : "";
 }
 
 function getMultiSelectValues(draft: MentalityDraft, questionKey: string) {
-  switch (questionKey) {
-    case "serious.priorities":
-      return draft.serious.priorities;
-    case "casual.boundaries":
-      return draft.casual.boundaries;
-    case "open.needsClarity":
-      return draft.open.needsClarity;
-    default:
-      return [];
-  }
+  const value = getValueAtPath(draft, questionKey);
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function applySingleSelectAnswer(
@@ -73,39 +91,14 @@ function applySingleSelectAnswer(
   questionKey: string,
   value: string,
 ): MentalityDraft {
-  switch (questionKey) {
-    case "relationshipIntent":
-      return {
-        ...currentDraft,
-        relationshipIntent: value as RelationshipIntent,
-      };
-    case "serious.pace":
-      return {
-        ...currentDraft,
-        serious: {
-          ...currentDraft.serious,
-          pace: value,
-        },
-      };
-    case "casual.frequency":
-      return {
-        ...currentDraft,
-        casual: {
-          ...currentDraft.casual,
-          frequency: value,
-        },
-      };
-    case "open.style":
-      return {
-        ...currentDraft,
-        open: {
-          ...currentDraft.open,
-          style: value,
-        },
-      };
-    default:
-      return currentDraft;
+  if (questionKey === "relationshipIntent") {
+    return {
+      ...currentDraft,
+      relationshipIntent: value as RelationshipIntent,
+    };
   }
+
+  return setValueAtPath(currentDraft as Record<string, unknown>, questionKey, value) as MentalityDraft;
 }
 
 function applyMultiSelectAnswer(
@@ -113,34 +106,11 @@ function applyMultiSelectAnswer(
   questionKey: string,
   value: string,
 ): MentalityDraft {
-  switch (questionKey) {
-    case "serious.priorities":
-      return {
-        ...currentDraft,
-        serious: {
-          ...currentDraft.serious,
-          priorities: toggleValue(currentDraft.serious.priorities, value),
-        },
-      };
-    case "casual.boundaries":
-      return {
-        ...currentDraft,
-        casual: {
-          ...currentDraft.casual,
-          boundaries: toggleValue(currentDraft.casual.boundaries, value),
-        },
-      };
-    case "open.needsClarity":
-      return {
-        ...currentDraft,
-        open: {
-          ...currentDraft.open,
-          needsClarity: toggleValue(currentDraft.open.needsClarity, value),
-        },
-      };
-    default:
-      return currentDraft;
-  }
+  return setValueAtPath(
+    currentDraft as Record<string, unknown>,
+    questionKey,
+    toggleValue(getMultiSelectValues(currentDraft, questionKey), value),
+  ) as MentalityDraft;
 }
 
 function renderQuestion(args: {

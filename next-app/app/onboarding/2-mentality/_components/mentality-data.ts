@@ -11,8 +11,7 @@ export const TOTAL_SECTIONS = 4;
 export const initialDraft: MentalityDraft = {
   relationshipIntent: "",
   serious: {
-    pace: "",
-    priorities: [],
+    answers: {},
   },
   casual: {
     frequency: "",

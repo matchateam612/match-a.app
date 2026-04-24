@@ -18,8 +18,7 @@ export function mapMentalityToInsert(
         relationshipIntent: draft.relationshipIntent || null,
       },
       seriousLongterm: {
-        pace: draft.serious.pace || null,
-        priorities: Array.isArray(draft.serious.priorities) ? draft.serious.priorities : [],
+        ...draft.serious.answers,
       },
       casualShortterm: {
         frequency: draft.casual.frequency || null,

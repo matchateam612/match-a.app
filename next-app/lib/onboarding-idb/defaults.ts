@@ -35,10 +35,10 @@ export function createDefaultOnboardingMetaRecord(): OnboardingMetaRecord {
           },
         },
         seriousLongterm: {
-          currentStepId: "serious_pace",
+          currentStepId: "serious_openness",
           completedStepIds: [],
           answers: {
-            ...mentalityInitialDraft.serious,
+            ...mentalityInitialDraft.serious.answers,
           },
         },
         casualShortterm: {

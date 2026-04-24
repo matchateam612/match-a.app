@@ -4,14 +4,7 @@ export type RelationshipIntent =
   | "open_to_both";
 
 export type MentalityBranch = "shared" | RelationshipIntent;
-export type MentalityQuestionId =
-  | "relationship_intent"
-  | "serious_pace"
-  | "serious_priorities"
-  | "casual_frequency"
-  | "casual_boundaries"
-  | "open_style"
-  | "open_clarity";
+export type MentalityQuestionId = string;
 
 export type SeriousPaceOption = "slow_and_intentional" | "steady_and_natural" | "ready_to_commit";
 export type CasualFrequencyOption = "once_in_a_while" | "regularly" | "depends_on_chemistry";
@@ -33,8 +26,7 @@ export type MentalityMultiSelectOption = {
 export type MentalityDraft = {
   relationshipIntent: RelationshipIntent | "";
   serious: {
-    pace: SeriousPaceOption | "";
-    priorities: string[];
+    answers: Record<string, string>;
   };
   casual: {
     frequency: CasualFrequencyOption | "";

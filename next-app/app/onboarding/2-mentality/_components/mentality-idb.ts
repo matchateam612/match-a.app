@@ -14,21 +14,19 @@ export type StoredMentalityState = {
   userInfo: UserInfo;
 };
 
+type RawMentalityProgress = {
+  branch?: MentalityProgress["branch"];
+  currentStepId?: string;
+  completedStepIds?: string[];
+};
+
 function isMentalityQuestionId(value: string): value is MentalityQuestionId {
-  return [
-    "relationship_intent",
-    "serious_pace",
-    "serious_priorities",
-    "casual_frequency",
-    "casual_boundaries",
-    "open_style",
-    "open_clarity",
-  ].includes(value);
+  return value.length > 0;
 }
 
 export function sanitizeMentalityProgress(
   draft: MentalityDraft,
-  progress?: Partial<MentalityProgress>,
+  progress?: RawMentalityProgress,
 ): MentalityProgress {
   const branch = draft.relationshipIntent || progress?.branch || "";
   const flow = getMentalityQuestions(branch);
@@ -58,11 +56,16 @@ function toMentalityDraft(section: Awaited<ReturnType<typeof getOrCreateOnboardi
   return {
     relationshipIntent: section.shared.answers.relationshipIntent,
     serious: {
-      ...initialDraft.serious,
-      ...(section.seriousLongterm.answers as Partial<MentalityDraft["serious"]>),
-      priorities: Array.isArray((section.seriousLongterm.answers as { priorities?: unknown }).priorities)
-        ? ((section.seriousLongterm.answers as { priorities: string[] }).priorities)
-        : initialDraft.serious.priorities,
+      answers:
+        section.seriousLongterm.answers &&
+        typeof section.seriousLongterm.answers === "object" &&
+        !Array.isArray(section.seriousLongterm.answers)
+          ? Object.fromEntries(
+              Object.entries(section.seriousLongterm.answers).filter(
+                ([, value]) => typeof value === "string",
+              ),
+            )
+          : initialDraft.serious.answers,
     },
     casual: {
       ...initialDraft.casual,
@@ -192,8 +195,7 @@ export async function persistMentalityStateToIdb(args: {
 export function hasMentalityDraftContent(draft: MentalityDraft) {
   return Boolean(
     draft.relationshipIntent ||
-      draft.serious.pace ||
-      draft.serious.priorities.length > 0 ||
+      Object.values(draft.serious.answers).some(Boolean) ||
       draft.casual.frequency ||
       draft.casual.boundaries.length > 0 ||
       draft.open.style ||

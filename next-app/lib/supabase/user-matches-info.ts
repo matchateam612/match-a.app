@@ -19,11 +19,18 @@ function buildMentalitySummary(
   }
 
   if (draft.relationshipIntent === "serious_longterm") {
-    const priorities = draft.serious.priorities.length > 0 ? draft.serious.priorities.join(", ") : null;
+    const seriousAnswerCount = Object.values(draft.serious.answers).filter(Boolean).length;
+    const mostRelevantSignals = [
+      draft.serious.answers.openness,
+      draft.serious.answers.chatFrequency,
+      draft.serious.answers.riskTolerance,
+      draft.serious.answers.closenessBalance,
+    ].filter(Boolean);
+
     return [
       "Serious / longterm",
-      draft.serious.pace ? `pace: ${draft.serious.pace}` : null,
-      priorities ? `priorities: ${priorities}` : null,
+      seriousAnswerCount > 0 ? `${seriousAnswerCount} signals captured` : null,
+      mostRelevantSignals.length > 0 ? `highlights: ${mostRelevantSignals.join(", ")}` : null,
     ]
       .filter(Boolean)
       .join(" | ");
