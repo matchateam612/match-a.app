@@ -1,62 +1,41 @@
 import type { AgentCriterionDefinition, AgentCriterionState } from "./agent-types";
 
 export const defaultAgentCriteria: AgentCriterionDefinition[] = [
-  {
-    id: "relationship_intention",
-    label: "Relationship intention",
-    description: "What kind of connection the user hopes to build.",
-    required: true,
-    placeholderSummary: "Still learning what kind of relationship they want.",
-  },
-  {
-    id: "communication_style",
-    label: "Communication style",
-    description: "How the user likes to communicate and be communicated with.",
-    required: true,
-    placeholderSummary: "Still learning how they want communication to feel.",
-  },
-  {
-    id: "partner_traits",
-    label: "Partner traits",
-    description: "The qualities they most want in a match.",
-    required: true,
-    placeholderSummary: "Still learning what they want in a partner.",
-  },
-  {
-    "id": "emotional_availability",
-    "label": "Emotional availability",
-    "description": "How much emotional bandwidth and openness the user currently has for a relationship.",
-    "required": true,
-    "placeholderSummary": "Still learning how emotionally available they are right now."
-  },
-  {
-    "id": "conflict_recovery",
-    "label": "Conflict recovery",
-    "description": "How the user prefers to repair and reconnect after a disagreement.",
-    "required": true,
-    "placeholderSummary": "Still learning how they bounce back from conflict."
-  },
-  {
-    "id": "quality_time_expression",
-    "label": "Quality time expression",
-    "description": "How the user most meaningfully experiences and gives quality time.",
-    "required": true,
-    "placeholderSummary": "Still learning how quality time feels best to them."
-  },
-  {
-    "id": "independence_balance",
-    "label": "Independence balance",
-    "description": "How much autonomy versus togetherness the user needs in a relationship.",
-    "required": true,
-    "placeholderSummary": "Still learning their ideal balance of space and closeness."
-  },
-  {
-    "id": "commitment_pacing",
-    "label": "Commitment pacing",
-    "description": "The speed at which the user prefers relationships to evolve and deepen.",
-    "required": true,
-    "placeholderSummary": "Still learning how fast or slow they want to move."
-  }
+{
+  id: "openness_availability",
+  label: "Openness and availability",
+  description: "How emotionally and practically available someone is to start something now.",
+  required: true,
+  placeholderSummary: "Still learning how available they are to start something.",
+},
+{
+  id: "early_stage_pacing",
+  label: "Early-stage pacing and momentum",
+  description: "How fast they like conversations, replies, and first meetings to develop.",
+  required: true,
+  placeholderSummary: "Still learning what pace feels right for them early on.",
+},
+{
+  id: "attraction_threshold",
+  label: "Attraction and selectivity threshold",
+  description: "How much they need an initial spark versus growing into interest over time.",
+  required: true,
+  placeholderSummary: "Still learning how quickly attraction tends to show up for them.",
+},
+{
+  id: "emotional_security",
+  label: "Emotional security and risk tolerance",
+  description: "How cautious they are, what reassures them, and what makes them pull back.",
+  required: true,
+  placeholderSummary: "Still learning what makes them feel safe or hesitant.",
+},
+{
+  id: "closeness_style",
+  label: "Closeness style in relationships",
+  description: "Whether they lean toward intensity, balance, autonomy, or flexibility in intimacy.",
+  required: true,
+  placeholderSummary: "Still learning how they naturally experience closeness.",
+}
 ];
 
 export function createCriterionState(

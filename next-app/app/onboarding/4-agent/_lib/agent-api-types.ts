@@ -41,6 +41,7 @@ export type SubmitAgentTurnResponse = {
 };
 
 export type CreateInitialAgentTurnResponse = {
+  criteria: AgentCriterionState[];
   assistantMessage: string;
   draftSummary: string;
   status: "collecting" | "confirming" | "complete";

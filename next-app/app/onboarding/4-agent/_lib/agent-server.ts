@@ -37,6 +37,12 @@ type ExtractorResult = {
   notes?: string;
 };
 
+type InitialCriteriaContext = {
+  criteriaDefinitions: AgentCriterionDefinition[];
+  currentCriteria: AgentCriterionState[];
+  priorOnboardingContext: ReturnType<typeof buildPriorOnboardingContext>;
+};
+
 function clipConfidence(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
@@ -116,6 +122,24 @@ function buildExtractorUserPrompt(request: SubmitAgentTurnRequest) {
       existingCriteria: request.criteria,
       transcript: request.transcript,
       latestUserMessage: request.userMessage,
+    },
+    null,
+    2,
+  );
+}
+
+function buildInitialCriteriaUserPrompt(context: InitialCriteriaContext) {
+  return JSON.stringify(
+    {
+      task: "Use prior onboarding context to prefill agent criteria before the first chat turn.",
+      criteriaDefinitions: context.criteriaDefinitions,
+      existingCriteria: context.currentCriteria,
+      priorOnboardingContext: context.priorOnboardingContext,
+      guidance: {
+        goal: "Give the interviewer a strong starting point so the onboarding conversation can finish in under 12 user turns when possible.",
+        confirmationRule:
+          "Mark a criterion confirmed only when the prior answers make that criterion very clear. Otherwise prefer tentative with needsConfirmation true.",
+      },
     },
     null,
     2,
@@ -298,6 +322,60 @@ async function runExtractor(request: SubmitAgentTurnRequest) {
     });
     throw error;
   }
+}
+
+async function runInitialCriteriaPrefill({
+  criteriaDefinitions,
+  currentCriteria,
+  priorOnboardingContext,
+}: InitialCriteriaContext) {
+  const env = getLlmEnv();
+
+  console.log("[agent-turn][initial-prefill] Starting initial criteria prefill.", {
+    provider: env.provider,
+    baseUrl: env.baseUrl,
+    model: env.extractorModel,
+    hasApiKey: Boolean(env.apiKey),
+    hasMentality: Boolean(priorOnboardingContext.mentality),
+  });
+
+  if (!priorOnboardingContext.mentality && !priorOnboardingContext.basicInfo && !priorOnboardingContext.picture) {
+    return {
+      rawOutput: JSON.stringify({ criteria: [], notes: "No prior onboarding context available." }),
+      parsedResult: { criteria: [], notes: "No prior onboarding context available." } satisfies ExtractorResult,
+    };
+  }
+
+  if (!env.apiKey) {
+    return {
+      rawOutput: JSON.stringify({ criteria: [], notes: "Skipped initial prefill because no LLM API key is configured." }),
+      parsedResult: { criteria: [], notes: "Skipped initial prefill because no LLM API key is configured." } satisfies ExtractorResult,
+    };
+  }
+
+  const rawOutput = await createOpenAiCompatibleChatCompletion({
+    model: env.extractorModel,
+    temperature: 0.1,
+    messages: [
+      {
+        role: "system",
+        content: buildExtractorSystemPrompt(criteriaDefinitions),
+      },
+      {
+        role: "user",
+        content: buildInitialCriteriaUserPrompt({
+          criteriaDefinitions,
+          currentCriteria,
+          priorOnboardingContext,
+        }),
+      },
+    ],
+  });
+
+  return {
+    rawOutput,
+    parsedResult: extractJsonObject(rawOutput),
+  };
 }
 
 async function runInterviewer({
@@ -656,13 +734,24 @@ export async function streamPreparedAgentTurn({
 export async function createInitialAgentTurn(
   request: CreateInitialAgentTurnRequest,
 ): Promise<CreateInitialAgentTurnResponse> {
-  const assistantMessage = await runInitialInterviewer(request);
-  const completion = summarizeCompletion(request.criteria);
+  const priorOnboardingContext = buildPriorOnboardingContext(request.userInfo);
+  const initialExtractor = await runInitialCriteriaPrefill({
+    criteriaDefinitions: request.criteriaDefinitions,
+    currentCriteria: request.criteria,
+    priorOnboardingContext,
+  });
+  const seededCriteria = mergeCriteria(request.criteria, initialExtractor.parsedResult);
+  const assistantMessage = await runInitialInterviewer({
+    ...request,
+    criteria: seededCriteria,
+  });
+  const completion = summarizeCompletion(seededCriteria);
 
   return {
+    criteria: seededCriteria,
     assistantMessage,
-    draftSummary: buildDraftSummary(request.criteria),
+    draftSummary: buildDraftSummary(seededCriteria),
     status: completion.readyToConfirm ? "confirming" : "collecting",
-    lastAskedCriterionId: getNextCriterionToExplore(request.criteria)?.id ?? null,
+    lastAskedCriterionId: getNextCriterionToExplore(seededCriteria)?.id ?? null,
   };
 }

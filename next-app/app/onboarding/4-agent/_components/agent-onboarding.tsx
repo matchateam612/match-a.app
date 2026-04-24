@@ -81,14 +81,16 @@ function AgentOnboardingClient() {
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [priorUserInfo, setPriorUserInfo] = useState<UserInfo>({});
   const promptSettings = readAgentPromptSettings();
   const criteriaDefinitions = readTestingCriteriaDefinitions();
   const userInfo: UserInfo = useMemo(
     () => ({
+      ...priorUserInfo,
       agent: draft,
       agent_system_prompt: promptSettings.interviewerSystemPrompt,
     }),
-    [draft, promptSettings.interviewerSystemPrompt],
+    [draft, priorUserInfo, promptSettings.interviewerSystemPrompt],
   );
   const { cancelSpeech, queueSpeechFromText } = useAgentSpeechPlayback({
     enabled: draft.selectedMode === "voice",
@@ -116,6 +118,7 @@ function AgentOnboardingClient() {
         setProgress(storedState.progress);
         setHasSavedDraft(storedState.hasSavedDraft);
         setCurrentInputMode(storedState.draft.selectedMode ?? "text");
+        setPriorUserInfo(storedState.userInfo);
       })
       .catch(() => {
         if (!isCancelled) {
@@ -208,6 +211,7 @@ function AgentOnboardingClient() {
 
       setDraft((current) => ({
         ...current,
+        criteria: payload.criteria,
         transcript: [initialTranscriptItem],
         status: nextStatus,
         finalSummary: payload.draftSummary,
