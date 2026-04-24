@@ -53,19 +53,21 @@ export function sanitizeMentalityProgress(
 }
 
 function toMentalityDraft(section: Awaited<ReturnType<typeof getOrCreateOnboardingMetaRecord>>["sections"]["mentality"]): MentalityDraft {
+  const seriousAnswers =
+    section.seriousLongterm.answers &&
+    typeof section.seriousLongterm.answers === "object" &&
+    !Array.isArray(section.seriousLongterm.answers)
+      ? Object.fromEntries(
+          Object.entries(section.seriousLongterm.answers).filter(
+            ([, value]): value is string => typeof value === "string",
+          ),
+        )
+      : initialDraft.serious.answers;
+
   return {
     relationshipIntent: section.shared.answers.relationshipIntent,
     serious: {
-      answers:
-        section.seriousLongterm.answers &&
-        typeof section.seriousLongterm.answers === "object" &&
-        !Array.isArray(section.seriousLongterm.answers)
-          ? Object.fromEntries(
-              Object.entries(section.seriousLongterm.answers).filter(
-                ([, value]) => typeof value === "string",
-              ),
-            )
-          : initialDraft.serious.answers,
+      answers: seriousAnswers,
     },
     casual: {
       ...initialDraft.casual,
