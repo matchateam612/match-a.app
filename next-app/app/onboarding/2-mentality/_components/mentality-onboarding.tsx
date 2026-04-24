@@ -16,7 +16,7 @@ import { upsertUserMentality } from "@/lib/supabase/user-mentality";
 import {
   initialDraft,
 } from "./mentality-data";
-import { getMentalityFlow } from "./mentality-flow";
+import { getMentalityQuestions } from "./mentality-questions";
 import {
   hasMentalityDraftContent,
   initialProgress,
@@ -25,47 +25,155 @@ import {
   sanitizeMentalityProgress,
 } from "./mentality-idb";
 import { MentalityLayout } from "./mentality-layout";
-import type { MentalityDraft, MentalityProgress, RelationshipIntent } from "./mentality-types";
-import { CasualBoundariesStep } from "./steps/casual-boundaries-step";
-import { CasualFrequencyStep } from "./steps/casual-frequency-step";
-import { OpenClarityStep } from "./steps/open-clarity-step";
-import { OpenStyleStep } from "./steps/open-style-step";
-import { RelationshipIntentStep } from "./steps/relationship-intent-step";
-import { SeriousPaceStep } from "./steps/serious-pace-step";
-import { SeriousPrioritiesStep } from "./steps/serious-priorities-step";
-
-function applyRelationshipIntentChange(
-  currentDraft: MentalityDraft,
-  nextIntent: RelationshipIntent,
-): { draft: MentalityDraft; progress: MentalityProgress } {
-  const nextDraft: MentalityDraft = {
-    relationshipIntent: nextIntent,
-    serious:
-      nextIntent === "serious_longterm"
-        ? currentDraft.serious
-        : { ...initialDraft.serious },
-    casual:
-      nextIntent === "casual_shortterm"
-        ? currentDraft.casual
-        : { ...initialDraft.casual },
-    open:
-      nextIntent === "open_to_both"
-        ? currentDraft.open
-        : { ...initialDraft.open },
-  };
-
-  return {
-    draft: nextDraft,
-    progress: {
-      branch: nextIntent,
-      currentStepId: "relationship_intent",
-      completedStepIds: [],
-    },
-  };
-}
+import type {
+  MentalityDraft,
+  MentalityMultiSelectOption,
+  MentalityProgress,
+  MentalityQuestionDefinition,
+  MentalitySingleSelectOption,
+  RelationshipIntent,
+} from "./mentality-types";
+import { MultiSelectStep } from "./steps/multi-select-step";
+import { SingleSelectStep } from "./steps/single-select-step";
 
 function toggleValue(values: string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function getSingleSelectValue(draft: MentalityDraft, questionKey: string) {
+  switch (questionKey) {
+    case "relationshipIntent":
+      return draft.relationshipIntent;
+    case "serious.pace":
+      return draft.serious.pace;
+    case "casual.frequency":
+      return draft.casual.frequency;
+    case "open.style":
+      return draft.open.style;
+    default:
+      return "";
+  }
+}
+
+function getMultiSelectValues(draft: MentalityDraft, questionKey: string) {
+  switch (questionKey) {
+    case "serious.priorities":
+      return draft.serious.priorities;
+    case "casual.boundaries":
+      return draft.casual.boundaries;
+    case "open.needsClarity":
+      return draft.open.needsClarity;
+    default:
+      return [];
+  }
+}
+
+function applySingleSelectAnswer(
+  currentDraft: MentalityDraft,
+  questionKey: string,
+  value: string,
+): MentalityDraft {
+  switch (questionKey) {
+    case "relationshipIntent":
+      return {
+        ...currentDraft,
+        relationshipIntent: value as RelationshipIntent,
+      };
+    case "serious.pace":
+      return {
+        ...currentDraft,
+        serious: {
+          ...currentDraft.serious,
+          pace: value,
+        },
+      };
+    case "casual.frequency":
+      return {
+        ...currentDraft,
+        casual: {
+          ...currentDraft.casual,
+          frequency: value,
+        },
+      };
+    case "open.style":
+      return {
+        ...currentDraft,
+        open: {
+          ...currentDraft.open,
+          style: value,
+        },
+      };
+    default:
+      return currentDraft;
+  }
+}
+
+function applyMultiSelectAnswer(
+  currentDraft: MentalityDraft,
+  questionKey: string,
+  value: string,
+): MentalityDraft {
+  switch (questionKey) {
+    case "serious.priorities":
+      return {
+        ...currentDraft,
+        serious: {
+          ...currentDraft.serious,
+          priorities: toggleValue(currentDraft.serious.priorities, value),
+        },
+      };
+    case "casual.boundaries":
+      return {
+        ...currentDraft,
+        casual: {
+          ...currentDraft.casual,
+          boundaries: toggleValue(currentDraft.casual.boundaries, value),
+        },
+      };
+    case "open.needsClarity":
+      return {
+        ...currentDraft,
+        open: {
+          ...currentDraft.open,
+          needsClarity: toggleValue(currentDraft.open.needsClarity, value),
+        },
+      };
+    default:
+      return currentDraft;
+  }
+}
+
+function renderQuestion(args: {
+  draft: MentalityDraft;
+  question: MentalityQuestionDefinition;
+  onSingleSelect: (questionKey: string, value: string) => void;
+  onMultiSelect: (questionKey: string, value: string) => void;
+}) {
+  const { draft, question, onSingleSelect, onMultiSelect } = args;
+
+  if (question.kind === "single_select") {
+    return (
+      <SingleSelectStep
+        label={question.label}
+        title={question.title}
+        description={question.description}
+        value={getSingleSelectValue(draft, question.questionKey)}
+        options={question.options as MentalitySingleSelectOption[]}
+        onChange={(value) => onSingleSelect(question.questionKey, value)}
+      />
+    );
+  }
+
+  return (
+    <MultiSelectStep
+      label={question.label}
+      title={question.title}
+      description={question.description}
+      values={getMultiSelectValues(draft, question.questionKey)}
+      options={question.options as MentalityMultiSelectOption[]}
+      onToggle={(value) => onMultiSelect(question.questionKey, value)}
+    />
+  );
 }
 
 export function MentalityOnboarding() {
@@ -135,7 +243,7 @@ function MentalityOnboardingClient() {
     setSaveMessage,
   });
 
-  const flow = useMemo(() => getMentalityFlow(draft.relationshipIntent), [draft.relationshipIntent]);
+  const flow = useMemo(() => getMentalityQuestions(draft.relationshipIntent), [draft.relationshipIntent]);
   const currentStepIndex = Math.max(
     0,
     flow.findIndex((step) => step.id === progress.currentStepId),
@@ -192,15 +300,15 @@ function MentalityOnboardingClient() {
 
   function updateRelationshipIntent(value: RelationshipIntent) {
     clearSaveFeedback();
-
-    if (draft.relationshipIntent === value) {
-      setDraft((current) => ({ ...current, relationshipIntent: value }));
-      return;
-    }
-
-    const nextState = applyRelationshipIntentChange(draft, value);
-    setDraft(nextState.draft);
-    setProgress(nextState.progress);
+    setDraft((current) => ({
+      ...current,
+      relationshipIntent: value,
+    }));
+    setProgress({
+      branch: value,
+      currentStepId: "relationship_intent",
+      completedStepIds: [],
+    });
   }
 
   async function finishMentality() {
@@ -246,104 +354,21 @@ function MentalityOnboardingClient() {
     }
   }
 
-  let stepContent = (
-    <RelationshipIntentStep
-      value={draft.relationshipIntent}
-      onChange={updateRelationshipIntent}
-    />
-  );
+  const stepContent = renderQuestion({
+    draft,
+    question: currentStep,
+    onSingleSelect: (questionKey, value) => {
+      if (questionKey === "relationshipIntent") {
+        updateRelationshipIntent(value as RelationshipIntent);
+        return;
+      }
 
-  if (currentStep.id === "serious_pace") {
-    stepContent = (
-      <SeriousPaceStep
-        value={draft.serious.pace}
-        onChange={(value) =>
-          setDraft((current) => ({
-            ...current,
-            serious: {
-              ...current.serious,
-              pace: value,
-            },
-          }))
-        }
-      />
-    );
-  } else if (currentStep.id === "serious_priorities") {
-    stepContent = (
-      <SeriousPrioritiesStep
-        values={draft.serious.priorities}
-        onToggle={(value) =>
-          setDraft((current) => ({
-            ...current,
-            serious: {
-              ...current.serious,
-              priorities: toggleValue(current.serious.priorities, value),
-            },
-          }))
-        }
-      />
-    );
-  } else if (currentStep.id === "casual_frequency") {
-    stepContent = (
-      <CasualFrequencyStep
-        value={draft.casual.frequency}
-        onChange={(value) =>
-          setDraft((current) => ({
-            ...current,
-            casual: {
-              ...current.casual,
-              frequency: value,
-            },
-          }))
-        }
-      />
-    );
-  } else if (currentStep.id === "casual_boundaries") {
-    stepContent = (
-      <CasualBoundariesStep
-        values={draft.casual.boundaries}
-        onToggle={(value) =>
-          setDraft((current) => ({
-            ...current,
-            casual: {
-              ...current.casual,
-              boundaries: toggleValue(current.casual.boundaries, value),
-            },
-          }))
-        }
-      />
-    );
-  } else if (currentStep.id === "open_style") {
-    stepContent = (
-      <OpenStyleStep
-        value={draft.open.style}
-        onChange={(value) =>
-          setDraft((current) => ({
-            ...current,
-            open: {
-              ...current.open,
-              style: value,
-            },
-          }))
-        }
-      />
-    );
-  } else if (currentStep.id === "open_clarity") {
-    stepContent = (
-      <OpenClarityStep
-        values={draft.open.needsClarity}
-        onToggle={(value) =>
-          setDraft((current) => ({
-            ...current,
-            open: {
-              ...current.open,
-              needsClarity: toggleValue(current.open.needsClarity, value),
-            },
-          }))
-        }
-      />
-    );
-  }
+      setDraft((current) => applySingleSelectAnswer(current, questionKey, value));
+    },
+    onMultiSelect: (questionKey, value) => {
+      setDraft((current) => applyMultiSelectAnswer(current, questionKey, value));
+    },
+  });
 
   return (
     <MentalityLayout

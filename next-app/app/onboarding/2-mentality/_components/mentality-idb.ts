@@ -1,12 +1,11 @@
 "use client";
 
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
-import { migrateLegacyOnboardingStorageIfNeeded } from "@/lib/onboarding-idb/migrate-legacy";
-import { updateOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
+import { getOrCreateOnboardingMetaRecord, updateOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
 import { markOnboardingSectionDirty } from "@/lib/onboarding-idb/section-sync";
-import { getFirstBranchStepId, getMentalityFlow, type MentalityStepId } from "./mentality-flow";
+import { getFirstBranchQuestionId, getMentalityQuestions } from "./mentality-questions";
 import { initialDraft, initialProgress } from "./mentality-data";
-import type { MentalityDraft, MentalityProgress } from "./mentality-types";
+import type { MentalityDraft, MentalityProgress, MentalityQuestionId } from "./mentality-types";
 
 export type StoredMentalityState = {
   draft: MentalityDraft;
@@ -15,7 +14,7 @@ export type StoredMentalityState = {
   userInfo: UserInfo;
 };
 
-function isMentalityStepId(value: string): value is MentalityStepId {
+function isMentalityQuestionId(value: string): value is MentalityQuestionId {
   return [
     "relationship_intent",
     "serious_pace",
@@ -32,30 +31,30 @@ export function sanitizeMentalityProgress(
   progress?: Partial<MentalityProgress>,
 ): MentalityProgress {
   const branch = draft.relationshipIntent || progress?.branch || "";
-  const flow = getMentalityFlow(branch);
-  const fallbackStepId = branch ? getFirstBranchStepId(branch) : "relationship_intent";
+  const flow = getMentalityQuestions(branch);
+  const fallbackStepId = branch ? getFirstBranchQuestionId(branch) : "relationship_intent";
   const requestedStepId =
-    progress?.currentStepId && isMentalityStepId(progress.currentStepId)
+    progress?.currentStepId && isMentalityQuestionId(progress.currentStepId)
       ? progress.currentStepId
       : fallbackStepId;
   const currentStepId = flow.some((step) => step.id === requestedStepId)
     ? requestedStepId
     : branch
-      ? getFirstBranchStepId(branch)
+      ? getFirstBranchQuestionId(branch)
       : "relationship_intent";
 
   return {
     branch,
     currentStepId,
     completedStepIds: Array.isArray(progress?.completedStepIds)
-      ? progress.completedStepIds.filter((stepId): stepId is MentalityStepId =>
-          isMentalityStepId(stepId) && flow.some((step) => step.id === stepId),
+      ? progress.completedStepIds.filter((stepId): stepId is MentalityQuestionId =>
+          isMentalityQuestionId(stepId) && flow.some((step) => step.id === stepId),
         )
       : [],
   };
 }
 
-function toMentalityDraft(section: Awaited<ReturnType<typeof migrateLegacyOnboardingStorageIfNeeded>>["sections"]["mentality"]): MentalityDraft {
+function toMentalityDraft(section: Awaited<ReturnType<typeof getOrCreateOnboardingMetaRecord>>["sections"]["mentality"]): MentalityDraft {
   return {
     relationshipIntent: section.shared.answers.relationshipIntent,
     serious: {
@@ -83,7 +82,7 @@ function toMentalityDraft(section: Awaited<ReturnType<typeof migrateLegacyOnboar
 }
 
 export async function readStoredMentalityStateFromIdb(): Promise<StoredMentalityState> {
-  const draftRecord = await migrateLegacyOnboardingStorageIfNeeded();
+  const draftRecord = await getOrCreateOnboardingMetaRecord();
   const draft = toMentalityDraft(draftRecord.sections.mentality);
   const progress = sanitizeMentalityProgress(draft, {
     branch: draftRecord.sections.mentality.selectedTrack,
@@ -149,9 +148,10 @@ export async function persistMentalityStateToIdb(args: {
             sanitizedProgress.branch === "serious_longterm"
               ? sanitizedProgress.currentStepId
               : current.sections.mentality.seriousLongterm.currentStepId,
-          completedStepIds: sanitizedProgress.completedStepIds.filter((stepId) =>
-            stepId.startsWith("serious_"),
-          ),
+          completedStepIds:
+            sanitizedProgress.branch === "serious_longterm"
+              ? sanitizedProgress.completedStepIds.filter((stepId) => stepId.startsWith("serious_"))
+              : current.sections.mentality.seriousLongterm.completedStepIds,
           answers: {
             ...args.draft.serious,
           },
@@ -161,9 +161,10 @@ export async function persistMentalityStateToIdb(args: {
             sanitizedProgress.branch === "casual_shortterm"
               ? sanitizedProgress.currentStepId
               : current.sections.mentality.casualShortterm.currentStepId,
-          completedStepIds: sanitizedProgress.completedStepIds.filter((stepId) =>
-            stepId.startsWith("casual_"),
-          ),
+          completedStepIds:
+            sanitizedProgress.branch === "casual_shortterm"
+              ? sanitizedProgress.completedStepIds.filter((stepId) => stepId.startsWith("casual_"))
+              : current.sections.mentality.casualShortterm.completedStepIds,
           answers: {
             ...args.draft.casual,
           },
@@ -173,9 +174,10 @@ export async function persistMentalityStateToIdb(args: {
             sanitizedProgress.branch === "open_to_both"
               ? sanitizedProgress.currentStepId
               : current.sections.mentality.openToBoth.currentStepId,
-          completedStepIds: sanitizedProgress.completedStepIds.filter((stepId) =>
-            stepId.startsWith("open_"),
-          ),
+          completedStepIds:
+            sanitizedProgress.branch === "open_to_both"
+              ? sanitizedProgress.completedStepIds.filter((stepId) => stepId.startsWith("open_"))
+              : current.sections.mentality.openToBoth.completedStepIds,
           answers: {
             ...args.draft.open,
           },
