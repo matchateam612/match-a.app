@@ -57,10 +57,15 @@ function toMentalityDraft(section: Awaited<ReturnType<typeof getOrCreateOnboardi
     section.seriousLongterm.answers &&
     typeof section.seriousLongterm.answers === "object" &&
     !Array.isArray(section.seriousLongterm.answers)
-      ? Object.fromEntries(
-          Object.entries(section.seriousLongterm.answers).filter(
-            ([, value]): value is string => typeof value === "string",
-          ),
+      ? Object.entries(section.seriousLongterm.answers).reduce<Record<string, string>>(
+          (result, [key, value]) => {
+            if (typeof value === "string") {
+              result[key] = value;
+            }
+
+            return result;
+          },
+          {},
         )
       : initialDraft.serious.answers;
 
