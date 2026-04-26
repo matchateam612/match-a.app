@@ -131,6 +131,7 @@ function PictureOnboardingClient() {
   } = usePictureDraftFiles({
     enabled: true,
   });
+  const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
 
   useEffect(() => {
     let isCancelled = false;
@@ -272,7 +273,6 @@ function PictureOnboardingClient() {
       : "Your picture draft will be saved on this device.";
   }, [hasSavedDraft, isHydratingMeta]);
 
-  const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
   const canGoToReview = Boolean(originalFile) && !isHydratingFiles && !isHydratingMeta;
   const canGenerateAvatars =
     Boolean(originalFile) &&
