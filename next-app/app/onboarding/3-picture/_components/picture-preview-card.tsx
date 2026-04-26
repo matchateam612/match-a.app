@@ -80,11 +80,11 @@ export function PicturePreviewCard({
             </div>
           ) : null}
         </div>
-        <p className={styles.helper}>
-          {generatedPreviewUrl
-            ? "Choose the original if the AI result feels too edited. You can still go back and regenerate."
-            : "Your original JPEG is ready. If you want, generate an AI version and compare both before continuing."}
-        </p>
+      <p className={styles.helper}>
+        {generatedPreviewUrl
+          ? "Choose the original if the AI result feels too edited. You can still go back and regenerate."
+          : "Your original JPEG is ready. Generate an avatar set when you want to compare different polished looks."}
+      </p>
         <button className={styles.backButton} type="button" onClick={onReset}>
           Choose a different photo
         </button>

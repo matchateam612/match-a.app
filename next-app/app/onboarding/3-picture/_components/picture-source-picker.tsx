@@ -1,45 +1,40 @@
 import styles from "../../_shared/onboarding-shell.module.scss";
 import pictureStyles from "./picture.module.scss";
-import type { PictureDraft, PictureSource } from "./picture-types";
 
 type PictureSourcePickerProps = {
-  draft: PictureDraft;
-  captureSource: PictureSource;
   disabled: boolean;
-  onUploadClick: () => void;
-  onCameraClick: () => void;
+  onTakePhotoClick: () => void;
+  onChooseLibraryClick: () => void;
 };
 
 export function PictureSourcePicker({
-  draft,
-  captureSource,
   disabled,
-  onUploadClick,
-  onCameraClick,
+  onTakePhotoClick,
+  onChooseLibraryClick,
 }: PictureSourcePickerProps) {
   return (
     <div className={`${styles.splitCard} ${pictureStyles.pickerCard}`.trim()}>
       <button
-        className={`${styles.chip} ${draft.source === "upload" ? styles.chipActive : ""}`.trim()}
+        className={`${styles.chip} ${pictureStyles.sourceChip}`.trim()}
         type="button"
-        onClick={onUploadClick}
+        onClick={onTakePhotoClick}
         disabled={disabled}
       >
-        <span className={styles.chipTitle}>Upload a photo</span>
+        <span className={styles.chipTitle}>Take a photo</span>
         <span className={styles.chipCopy}>
-          Pick an image from this device and we will convert it to a profile-ready JPEG.
+          Open your phone&apos;s camera UI, capture a selfie, and use it as the base for your avatar.
         </span>
       </button>
 
       <button
-        className={`${styles.chip} ${captureSource === "camera" ? styles.chipActive : ""}`.trim()}
+        className={`${styles.chip} ${pictureStyles.sourceChip}`.trim()}
         type="button"
-        onClick={onCameraClick}
+        onClick={onChooseLibraryClick}
         disabled={disabled}
       >
-        <span className={styles.chipTitle}>Use front camera</span>
+        <span className={styles.chipTitle}>Choose from library</span>
         <span className={styles.chipCopy}>
-          Open the selfie camera, capture one frame, and use it as your onboarding photo.
+          Pick an existing photo from this device and we will prepare it for your main profile.
         </span>
       </button>
     </div>

@@ -8,18 +8,24 @@ type PictureHeroProps = {
 const STEP_COPY = [
   {
     eyebrow: "Step 1",
-    title: "Add your main profile photo.",
+    title: "Start with one strong photo.",
     copy:
-      "Use a real photo of yourself. On phones this step stays focused on just getting one strong image in place.",
+      "On mobile, this step should feel simple: take a photo now or pick one from your device.",
   },
   {
     eyebrow: "Step 2",
-    title: "Generate an AI version if you want one.",
+    title: "Review the photo full screen.",
     copy:
-      "Try a polished AI pass, then choose whether you want to keep the original or use the generated version.",
+      "Make sure the base image feels right before we generate your avatar set from it.",
   },
   {
     eyebrow: "Step 3",
+    title: "Choose your avatar look.",
+    copy:
+      "We generate three polished versions from the same photo so you can pick the one that fits best.",
+  },
+  {
+    eyebrow: "Step 4",
     title: "Fill your extra gallery.",
     copy:
       "Add up to nine private photos in a denser gallery layout that is easier to scan on mobile.",
