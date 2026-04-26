@@ -58,7 +58,13 @@ export async function persistPictureStateToIdb(args: {
 }
 
 export function hasPictureDraftContent(draft: PictureDraft) {
-  return Boolean(draft.fileName || draft.source || draft.prompt.trim());
+  return Boolean(
+    draft.fileName ||
+    draft.source ||
+    draft.prompt1.trim() ||
+    draft.prompt2.trim() ||
+    draft.prompt3.trim()
+  );
 }
 
 export function isPictureReady(draft: PictureDraft) {

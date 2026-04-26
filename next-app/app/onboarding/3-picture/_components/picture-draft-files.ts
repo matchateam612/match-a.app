@@ -114,6 +114,7 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
     generatedFile,
     originalPreviewUrl,
     generatedPreviewUrl,
+    replaceFiles,
     setOriginalFile: useCallback(
       async (file: File | null) => {
         await replaceFiles({

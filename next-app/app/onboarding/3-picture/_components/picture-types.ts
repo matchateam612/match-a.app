@@ -2,7 +2,9 @@ export type PictureSource = "upload" | "camera" | "";
 
 export type PictureDraft = {
   source: PictureSource;
-  prompt: string;
+  prompt1: string;
+  prompt2: string;
+  prompt3: string;
   fileName: string;
   mimeType: string;
   width: number;

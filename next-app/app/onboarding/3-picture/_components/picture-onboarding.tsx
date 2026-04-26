@@ -53,12 +53,6 @@ type GeneratedAvatarOption = {
   previewUrl: string;
 };
 
-const AVATAR_PROMPTS = [
-  "Turn this real profile photo into a clean, flattering dating profile portrait. Keep the same person, facial structure, skin tone, hair color, and overall identity. Improve lighting, keep the framing mobile-friendly, and make the result warm and natural.",
-  "Turn this real profile photo into a polished dating profile portrait. Keep the same person and identity, brighten the face slightly, refine the crop, soften the background, and keep the result realistic and believable.",
-  "Turn this real profile photo into a premium-looking dating profile portrait. Keep the same person, preserve facial structure and skin tone, add crisp but natural detail, even lighting, and a confident modern portrait feel without looking fake.",
-] as const;
-
 export function PictureOnboarding() {
   const isClientReady = useClientReady();
 
@@ -110,7 +104,7 @@ function PictureOnboardingClient() {
   const [isHydratingMeta, setIsHydratingMeta] = useState(true);
   const [draft, setDraft] = useState<PictureDraft>(initialDraft);
   const [progress, setCurrentStep] = useState(0);
-  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [restoredHasSavedDraft, setRestoredHasSavedDraft] = useState(false);
   const [isSavingSection, setIsSavingSection] = useState(false);
   const [isTransformingImage, setIsTransformingImage] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -125,13 +119,18 @@ function PictureOnboardingClient() {
     originalFile,
     generatedFile,
     originalPreviewUrl,
-    setOriginalFile,
     setGeneratedFile,
+    replaceFiles,
     clearFiles,
   } = usePictureDraftFiles({
     enabled: true,
   });
   const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
+
+  const avatarPrompts = useMemo(
+    () => [draft.prompt1, draft.prompt2, draft.prompt3].filter((prompt) => prompt.trim().length > 0),
+    [draft.prompt1, draft.prompt2, draft.prompt3],
+  );
 
   useEffect(() => {
     let isCancelled = false;
@@ -144,7 +143,7 @@ function PictureOnboardingClient() {
 
         setDraft(storedState.draft);
         setCurrentStep(storedState.progress);
-        setHasSavedDraft(storedState.hasSavedDraft);
+        setRestoredHasSavedDraft(storedState.hasSavedDraft);
       })
       .catch(() => {
         if (!isCancelled) {
@@ -168,9 +167,6 @@ function PictureOnboardingClient() {
     }
 
     const selectedVariant = draft.hasGeneratedImage ? "aiTransformed" : "original";
-    const nextHasSavedDraft = hasPictureDraftContent(draft);
-
-    setHasSavedDraft(nextHasSavedDraft);
 
     void persistPictureStateToIdb({
       draft,
@@ -236,10 +232,10 @@ function PictureOnboardingClient() {
       return;
     }
 
-    if (hasSavedDraft && draft.fileName && !originalFile) {
+    if (restoredHasSavedDraft && draft.fileName && !originalFile) {
       setSaveError("Your saved picture metadata was found, but the local photo draft is unavailable.");
     }
-  }, [draft.fileName, hasSavedDraft, isHydratingFiles, isHydratingMeta, originalFile, setSaveError]);
+  }, [draft.fileName, isHydratingFiles, isHydratingMeta, originalFile, restoredHasSavedDraft, setSaveError]);
 
   useEffect(() => {
     if (currentStep > 0 && !originalFile && !isHydratingFiles) {
@@ -263,6 +259,8 @@ function PictureOnboardingClient() {
     };
   }, [generatedAvatarOptions]);
 
+  const hasSavedDraft = useMemo(() => hasPictureDraftContent(draft), [draft]);
+
   const draftStatus = useMemo(() => {
     if (isHydratingMeta) {
       return "Preparing your saved picture draft...";
@@ -273,20 +271,22 @@ function PictureOnboardingClient() {
       : "Your picture draft will be saved on this device.";
   }, [hasSavedDraft, isHydratingMeta]);
 
-  const canGoToReview = Boolean(originalFile) && !isHydratingFiles && !isHydratingMeta;
   const canGenerateAvatars =
     Boolean(originalFile) &&
+    avatarPrompts.length === 3 &&
     !isTransformingImage &&
     !isSavingSection &&
     !isHydratingFiles &&
     !isHydratingMeta;
   const canGoToGallery =
-    generatedAvatarOptions.length === AVATAR_PROMPTS.length && !isTransformingImage;
+    generatedAvatarOptions.length === avatarPrompts.length &&
+    generatedAvatarOptions.length > 0 &&
+    !isTransformingImage;
   const canContinue = useMemo(
     () =>
       isPictureReady(draft) &&
       Boolean(originalFile) &&
-      Boolean(generatedAvatarOptions[selectedAvatarIndex] ?? generatedFile ?? originalFile) &&
+      Boolean(generatedAvatarOptions[selectedAvatarIndex]?.file ?? generatedFile ?? originalFile) &&
       !isTransformingImage &&
       !isHydratingFiles &&
       !isHydratingMeta,
@@ -317,19 +317,21 @@ function PictureOnboardingClient() {
       try {
         const prepared = await preparePictureFile(file);
 
-        await setOriginalFile(prepared.file);
-        await setGeneratedFile(null);
+        await replaceFiles({
+          original: prepared.file,
+          generated: null,
+        });
         resetGeneratedAvatars();
-        setDraft({
+        setDraft((current) => ({
+          ...current,
           source,
-          prompt: initialDraft.prompt,
           fileName: prepared.file.name,
           mimeType: prepared.file.type,
           width: prepared.width,
           height: prepared.height,
           transformedAt: "",
           hasGeneratedImage: false,
-        });
+        }));
         setCurrentStep(1);
       } catch (error) {
         setSaveError(
@@ -339,7 +341,7 @@ function PictureOnboardingClient() {
         );
       }
     },
-    [clearSaveFeedback, resetGeneratedAvatars, setGeneratedFile, setOriginalFile, setSaveError],
+    [clearSaveFeedback, replaceFiles, resetGeneratedAvatars, setSaveError],
   );
 
   const onFileChange = useCallback(
@@ -429,7 +431,7 @@ function PictureOnboardingClient() {
   );
 
   const runAiTransform = useCallback(async () => {
-    if (!originalFile || isTransformingImage || isSavingSection) {
+    if (!originalFile || isTransformingImage || isSavingSection || avatarPrompts.length !== 3) {
       return;
     }
 
@@ -439,7 +441,7 @@ function PictureOnboardingClient() {
     try {
       const nextOptions: GeneratedAvatarOption[] = [];
 
-      for (const prompt of AVATAR_PROMPTS) {
+      for (const prompt of avatarPrompts) {
         const transformed = await transformPictureWithAi(originalFile, prompt);
         nextOptions.push({
           file: transformed,
@@ -453,7 +455,6 @@ function PictureOnboardingClient() {
       await setGeneratedFile(nextOptions[0]?.file ?? null);
       setDraft((current) => ({
         ...current,
-        prompt: AVATAR_PROMPTS[0],
         transformedAt: new Date().toISOString(),
         hasGeneratedImage: true,
       }));
@@ -469,6 +470,7 @@ function PictureOnboardingClient() {
       setIsTransformingImage(false);
     }
   }, [
+    avatarPrompts,
     clearSaveFeedback,
     isSavingSection,
     isTransformingImage,
@@ -597,15 +599,6 @@ function PictureOnboardingClient() {
   }, [currentStep, resetPhoto, router]);
 
   const goNext = useCallback(() => {
-    if (currentStep === 0) {
-      if (!canGoToReview) {
-        return;
-      }
-
-      setCurrentStep(1);
-      return;
-    }
-
     if (currentStep === 1) {
       if (!canGenerateAvatars) {
         return;
@@ -622,7 +615,7 @@ function PictureOnboardingClient() {
 
       setCurrentStep(3);
     }
-  }, [canGenerateAvatars, canGoToGallery, canGoToReview, currentStep, runAiTransform]);
+  }, [canGenerateAvatars, canGoToGallery, currentStep, runAiTransform]);
 
   const interactionDisabled =
     isTransformingImage || isSavingSection || isHydratingFiles || isHydratingMeta;
@@ -664,17 +657,15 @@ function PictureOnboardingClient() {
                 onClick={goNext}
                 disabled={
                   currentStep === 0
-                    ? !canGoToReview || isSavingSection
+                    ? true
                     : currentStep === 1
                       ? !canGenerateAvatars || isSavingSection
                       : !canGoToGallery || isSavingSection
                 }
               >
-                {currentStep === 0
-                  ? "Review photo"
-                  : currentStep === 1
-                    ? (isTransformingImage ? "Generating..." : "Generate avatar based on this photo")
-                    : "Proceed to gallery"}
+                {currentStep === 1
+                  ? (isTransformingImage ? "Generating..." : "Generate avatar based on this photo")
+                  : "Proceed to gallery"}
               </button>
             ) : (
               <button
