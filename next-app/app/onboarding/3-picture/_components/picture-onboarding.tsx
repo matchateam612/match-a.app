@@ -232,14 +232,14 @@ function PictureOnboardingClient() {
   }, [setSaveError]);
 
   useEffect(() => {
-    if (isHydratingFiles) {
+    if (isHydratingFiles || isHydratingMeta) {
       return;
     }
 
-    if (draft.fileName && !originalFile) {
+    if (hasSavedDraft && draft.fileName && !originalFile) {
       setSaveError("Your saved picture metadata was found, but the local photo draft is unavailable.");
     }
-  }, [draft.fileName, isHydratingFiles, originalFile, setSaveError]);
+  }, [draft.fileName, hasSavedDraft, isHydratingFiles, isHydratingMeta, originalFile, setSaveError]);
 
   useEffect(() => {
     if (currentStep > 0 && !originalFile && !isHydratingFiles) {
