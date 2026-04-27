@@ -8,6 +8,7 @@ import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { updateOnboardingStatusRequest } from "@/lib/supabase/onboarding-status-api";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import { getUserPfpPath } from "@/lib/supabase/user-picture";
 import {
@@ -563,6 +564,7 @@ function PictureOnboardingClient() {
         userId: user.id,
         profilePicturePath: getUserPfpPath(user.id),
       });
+      await updateOnboardingStatusRequest("4-agent");
       setSaveMessage("Your main photo is saved.");
       router.push("/onboarding/4-agent");
     } catch (error) {

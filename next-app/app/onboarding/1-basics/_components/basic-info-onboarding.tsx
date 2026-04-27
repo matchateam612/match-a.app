@@ -9,6 +9,7 @@ import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-sec
 import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { updateOnboardingStatusRequest } from "@/lib/supabase/onboarding-status-api";
 import { upsertUserBasicInfo } from "@/lib/supabase/user-basic-info";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import { BasicInfoLayout } from "./basic-info-layout";
@@ -254,6 +255,7 @@ function BasicInfoOnboardingClient() {
             : "Your basics were saved, but we could not finish syncing them yet.",
         );
       }
+      await updateOnboardingStatusRequest("2-mentality");
       setSaveMessage("Your basics are saved.");
       router.push("/onboarding/2-mentality");
     } catch (error) {

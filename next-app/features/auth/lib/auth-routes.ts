@@ -10,14 +10,6 @@ export const AUTH_SUCCESS_MESSAGES = {
     "Your email has been confirmed. Sign in to continue.",
 } as const;
 
-export function getPostSignInRoute() {
-  return "/onboarding";
-}
-
-export function getPostSignUpRoute() {
-  return "/onboarding";
-}
-
 export function getPasswordResetSuccessRoute() {
   return "/signin?message=password-reset-success";
 }

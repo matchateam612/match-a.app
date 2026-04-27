@@ -15,13 +15,12 @@ import { getAuthPageCopy } from "../lib/auth-copy";
 import { getAuthFeedback, getPasswordHint } from "../lib/auth-errors";
 import {
   getCheckEmailRoute,
-  getPostSignInRoute,
-  getPostSignUpRoute,
 } from "../lib/auth-routes";
 import type { AuthMode } from "../lib/auth-types";
 import { AuthMethods } from "./auth-methods";
 import { PasswordField } from "./password-field";
 import { TermsModal } from "./terms-modal";
+import { getCurrentUserSystemState, getRouteForOnboardingStatus } from "@/lib/supabase/user-system-state";
 
 type AuthFormProps = {
   initialMessage?: string;
@@ -63,7 +62,13 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
         const user = await getCurrentUser();
 
         if (user && isActive) {
-          router.replace(getPostSignInRoute());
+          const systemState = await getCurrentUserSystemState();
+
+          if (!systemState) {
+            throw new Error("We couldn't find your onboarding state.");
+          }
+
+          router.replace(getRouteForOnboardingStatus(systemState.onboarding_status));
           return;
         }
       } catch {
@@ -100,7 +105,13 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
           email: formState.email,
           password: formState.password,
         });
-        router.push(getPostSignInRoute());
+        const systemState = await getCurrentUserSystemState();
+
+        if (!systemState) {
+          throw new Error("We couldn't find your onboarding state.");
+        }
+
+        router.push(getRouteForOnboardingStatus(systemState.onboarding_status));
         return;
       }
 
@@ -114,7 +125,7 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
       });
 
       if (data.session) {
-        router.push(getPostSignUpRoute());
+        router.push("/onboarding/1-basics");
         return;
       }
 

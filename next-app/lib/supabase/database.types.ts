@@ -9,6 +9,15 @@ import type { RelationshipIntent } from "@/app/onboarding/2-mentality/_component
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+export type OnboardingStatus =
+  | "1-basics"
+  | "2-mentality"
+  | "3-picture"
+  | "4-agent"
+  | "finished";
+
+export type UserTier = "free" | "paid";
+
 export type Database = {
   public: {
     Tables: {
@@ -143,6 +152,36 @@ export type Database = {
           agent_summary?: string | null;
           profile_picture_path?: string | null;
           visible_payload?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      user_system_state: {
+        Row: {
+          user_id: string;
+          onboarding_status: OnboardingStatus;
+          tier: UserTier;
+          promoted_by: string | null;
+          report_flags: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          onboarding_status?: OnboardingStatus;
+          tier?: UserTier;
+          promoted_by?: string | null;
+          report_flags?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          onboarding_status?: OnboardingStatus;
+          tier?: UserTier;
+          promoted_by?: string | null;
+          report_flags?: string[];
+          created_at?: string;
           updated_at?: string;
         };
         Relationships: [];

@@ -5,9 +5,13 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { getOnboardingMetaRecord } from "@/lib/onboarding-idb/meta-store";
+import {
+  getCurrentUserSystemState,
+  getRouteForOnboardingStatus,
+  isFinishedOnboardingStatus,
+  isOnboardingPathAllowed,
+} from "@/lib/supabase/user-system-state";
 
-import { getNextOnboardingRoute } from "./onboarding-routing";
 
 type RouteGuardProps = {
   area: "dashboard" | "onboarding";
@@ -22,10 +26,6 @@ export function OnboardingRouteGuard({ area, children }: RouteGuardProps) {
   useEffect(() => {
     let isActive = true;
 
-    function isAllowedOnboardingPath(path: string, nextRoute: string) {
-      return path === nextRoute || path.startsWith(`${nextRoute}/`);
-    }
-
     async function checkAccess() {
       try {
         const user = await getCurrentUser();
@@ -37,20 +37,33 @@ export function OnboardingRouteGuard({ area, children }: RouteGuardProps) {
           return;
         }
 
-        const nextRoute = getNextOnboardingRoute(await getOnboardingMetaRecord());
+        const systemState = await getCurrentUserSystemState();
 
         if (!isActive) {
           return;
         }
 
+        if (!systemState) {
+          throw new Error("We couldn't find your onboarding state.");
+        }
+
+        const nextRoute = getRouteForOnboardingStatus(systemState.onboarding_status);
+
         if (area === "dashboard") {
-          if (nextRoute !== "/dashboard") {
+          if (!isFinishedOnboardingStatus(systemState.onboarding_status)) {
             router.replace(nextRoute);
             return;
           }
-        } else if (!isAllowedOnboardingPath(pathname, nextRoute)) {
-          router.replace(nextRoute);
-          return;
+        } else {
+          if (isFinishedOnboardingStatus(systemState.onboarding_status)) {
+            router.replace("/dashboard");
+            return;
+          }
+
+          if (!isOnboardingPathAllowed(systemState.onboarding_status, pathname)) {
+            router.replace(nextRoute);
+            return;
+          }
         }
 
         setIsCheckingAccess(false);

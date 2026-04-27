@@ -8,6 +8,7 @@ import { useClientReady } from "@/app/onboarding/_shared/onboarding-storage";
 import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-section-status";
 import type { UserInfo } from "@/app/onboarding/_shared/user-info-types";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { updateOnboardingStatusRequest } from "@/lib/supabase/onboarding-status-api";
 import { upsertUserAgentProfile } from "@/lib/supabase/user-agent-profile";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import type {
@@ -461,6 +462,7 @@ function AgentOnboardingClient() {
         userId: user.id,
         agentSummary: nextDraft.finalSummary ?? draftSummary,
       });
+      await updateOnboardingStatusRequest("finished");
 
       setSaveMessage("Your onboarding summary is saved.");
       router.push("/dashboard");

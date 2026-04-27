@@ -11,6 +11,7 @@ import { OnboardingSectionStatus } from "@/app/onboarding/_shared/onboarding-sec
 import { useOnboardingSectionState } from "@/app/onboarding/_shared/use-onboarding-section-state";
 import { useSectionSaveFeedback } from "@/app/onboarding/_shared/use-section-save-feedback";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { updateOnboardingStatusRequest } from "@/lib/supabase/onboarding-status-api";
 import { upsertUserMatchesInfo } from "@/lib/supabase/user-matches-info";
 import { upsertUserMentality } from "@/lib/supabase/user-mentality";
 import {
@@ -310,6 +311,7 @@ function MentalityOnboardingClient() {
         mentality: draft,
         mentalityProgress: finalProgress,
       });
+      await updateOnboardingStatusRequest("3-picture");
       setProgress(finalProgress);
       setSaveMessage("Your dating intentions are saved.");
       router.push("/onboarding/3-picture");
