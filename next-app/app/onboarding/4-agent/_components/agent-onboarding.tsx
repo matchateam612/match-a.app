@@ -40,6 +40,25 @@ type PendingVoiceDraft = {
   error: string;
 };
 
+function isAssistantConfirmationPrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    (normalized.includes("let me try to see if i'm getting the full picture") ||
+      normalized.includes("let me see if i'm getting the full picture") ||
+      normalized.includes("from what you've shared, it sounds like") ||
+      normalized.includes("here's what i'm hearing so far")) &&
+    (normalized.includes("does that") ||
+      normalized.includes("did i get that right") ||
+      normalized.includes("does that feel") ||
+      normalized.includes("does that land"))
+  );
+}
+
 export function AgentOnboarding() {
   const isClientReady = useClientReady();
 
@@ -155,12 +174,6 @@ function AgentOnboardingClient() {
     });
   }, [criteriaDefinitions, draft, isHydrating, progress, promptSettings]);
 
-  useEffect(() => {
-    if (draft.status === "confirming") {
-      setIsConfirmationSheetVisible(true);
-    }
-  }, [draft.status, draft.transcript.length]);
-
   const draftStatus = useMemo(() => {
     if (isHydrating) {
       return "Preparing your saved agent conversation...";
@@ -221,11 +234,12 @@ function AgentOnboardingClient() {
         ...current,
         criteria: payload.criteria,
         transcript: [initialTranscriptItem],
-        status: nextStatus,
+        status: isAssistantConfirmationPrompt(payload.assistantMessage) ? "confirming" : nextStatus,
         finalSummary: payload.draftSummary,
         lastAskedCriterionId: payload.lastAskedCriterionId,
       }));
-      setProgress(nextStatus);
+      setProgress(isAssistantConfirmationPrompt(payload.assistantMessage) ? "confirming" : nextStatus);
+      setIsConfirmationSheetVisible(isAssistantConfirmationPrompt(payload.assistantMessage));
       setSaveMessage("Your onboarding conversation is ready.");
 
       if (draft.selectedMode === "voice") {
@@ -322,8 +336,13 @@ function AgentOnboardingClient() {
         });
 
         const assistantText = completedPayload.assistantMessage || streamedAssistantMessage;
+        const shouldShowConfirmationSheet = isAssistantConfirmationPrompt(assistantText);
+        const resolvedStatus = shouldShowConfirmationSheet
+          ? "confirming"
+          : getCappedStatus(nextTurnCount, completedPayload.status);
         queueSpeechFromText(assistantText, true);
         setPendingAssistantMessage("");
+        setIsConfirmationSheetVisible(shouldShowConfirmationSheet);
 
         setDraft((current) => ({
           ...current,
@@ -336,12 +355,12 @@ function AgentOnboardingClient() {
               text: assistantText,
             }),
           ],
-          status: getCappedStatus(nextTurnCount, completedPayload.status),
+          status: resolvedStatus,
           finalSummary: completedPayload.draftSummary,
           lastAskedCriterionId: completedPayload.lastAskedCriterionId,
         }));
 
-        setProgress(getCappedStatus(nextTurnCount, completedPayload.status));
+        setProgress(resolvedStatus);
         setSaveMessage(
           nextTurnCount >= MAX_AGENT_TURNS
             ? "Reached the 20-turn cap. The conversation is now ready for summary confirmation."

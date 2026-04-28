@@ -58,7 +58,6 @@ export function ChatPanel({
   transcript,
   pendingAssistantMessage = "",
   isSubmittingTurn = false,
-  finalSummary,
   isConfirmationSheetVisible,
   isSpeechMuted,
   pendingVoiceDraft,
@@ -71,7 +70,7 @@ export function ChatPanel({
   onKeepChatting,
   onToggleSpeechMute,
 }: ChatPanelProps) {
-  const showComposer = status !== "complete";
+  const showComposer = status !== "complete" && !isConfirmationSheetVisible;
 
   return (
     <div className={styles.agentChatPanel}>
@@ -79,12 +78,10 @@ export function ChatPanel({
 
       {status === "confirming" && isConfirmationSheetVisible ? (
         <div className={styles.agentConfirmCard}>
-          <span className={styles.inlineLabel}>Ready to finish</span>
-          <p style={{ marginTop: 0, marginBottom: 8 }}>Does this feel right, or do you want to keep chatting a little longer?</p>
-          {finalSummary ? <p style={{ marginTop: 0, marginBottom: 8 }}>{finalSummary}</p> : null}
+          <span className={styles.inlineLabel}>Confirm</span>
           <div className={styles.agentConfirmActions}>
             <button type="button" className={styles.backButton} onClick={onKeepChatting}>
-              Keep chatting
+              No
             </button>
             <button type="button" className={styles.nextButton} onClick={onConfirmConversation}>
               Confirm
