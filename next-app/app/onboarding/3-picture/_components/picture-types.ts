@@ -1,16 +1,17 @@
 export type PictureSource = "upload" | "camera" | "";
+export type PictureGenerationStatus = "idle" | "loading" | "success" | "error";
 
 export type PictureDraft = {
   source: PictureSource;
-  prompt1: string;
-  prompt2: string;
-  prompt3: string;
   fileName: string;
   mimeType: string;
   width: number;
   height: number;
-  transformedAt: string;
-  hasGeneratedImage: boolean;
+  originalAssetKey: string;
+  generatedAssetKey: string;
+  generationStatus: PictureGenerationStatus;
+  generationError: string;
+  selectedAvatarIndex: number;
 };
 
 export type GalleryPictureSlot = {

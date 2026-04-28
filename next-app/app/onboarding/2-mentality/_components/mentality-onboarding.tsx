@@ -253,6 +253,7 @@ function MentalityOnboardingClient() {
 
   function goBack() {
     if (currentStepIndex === 0) {
+      router.push("/onboarding/1-basics");
       return;
     }
 

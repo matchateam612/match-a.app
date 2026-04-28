@@ -20,12 +20,12 @@ function revokeUrl(url: string | null) {
 export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
   const [hasHydratedFiles, setHasHydratedFiles] = useState(false);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
-  const [generatedFile, setGeneratedFile] = useState<File | null>(null);
+  const [generatedFiles, setGeneratedFiles] = useState<(File | null)[]>([null, null, null]);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
-  const [generatedPreviewUrl, setGeneratedPreviewUrl] = useState<string | null>(null);
+  const [generatedPreviewUrls, setGeneratedPreviewUrls] = useState<(string | null)[]>([null, null, null]);
 
   const setPreviewFile = useCallback(
-    (kind: "original" | "generated", file: File | null) => {
+    (kind: "original" | "generated", file: File | null, index = 0) => {
       const nextUrl = file ? URL.createObjectURL(file) : null;
 
       if (kind === "original") {
@@ -37,19 +37,33 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
         return;
       }
 
-      setGeneratedPreviewUrl((currentUrl) => {
-        revokeUrl(currentUrl);
-        return nextUrl;
+      setGeneratedPreviewUrls((currentUrls) => {
+        const nextUrls = [...currentUrls];
+        revokeUrl(nextUrls[index] ?? null);
+        nextUrls[index] = nextUrl;
+        return nextUrls;
       });
-      setGeneratedFile(file);
+      setGeneratedFiles((currentFiles) => {
+        const nextFiles = [...currentFiles];
+        nextFiles[index] = file;
+        return nextFiles;
+      });
     },
     [],
   );
 
   const replaceFiles = useCallback(
-    async ({ original, generated }: { original: File | null; generated: File | null }) => {
+    async ({
+      original,
+      generated,
+    }: {
+      original: File | null;
+      generated: [File | null, File | null, File | null];
+    }) => {
       setPreviewFile("original", original);
-      setPreviewFile("generated", generated);
+      generated.forEach((file, index) => {
+        setPreviewFile("generated", file, index);
+      });
 
       await Promise.all([
         original
@@ -59,13 +73,15 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
               updatedAt: new Date().toISOString(),
             })
           : clearOnboardingFileRecord("pfp-original"),
-        generated
-          ? setOnboardingFileRecord({
-              id: "pfp-ai",
-              file: generated,
-              updatedAt: new Date().toISOString(),
-            })
-          : clearOnboardingFileRecord("pfp-ai"),
+        ...generated.map((file, index) =>
+          file
+            ? setOnboardingFileRecord({
+                id: `pfp-ai-${index + 1}` as const,
+                file,
+                updatedAt: new Date().toISOString(),
+              })
+            : clearOnboardingFileRecord(`pfp-ai-${index + 1}` as const),
+        ),
       ]);
     },
     [setPreviewFile],
@@ -80,15 +96,19 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
 
     void Promise.all([
       getOnboardingFileRecord("pfp-original"),
-      getOnboardingFileRecord("pfp-ai"),
+      getOnboardingFileRecord("pfp-ai-1"),
+      getOnboardingFileRecord("pfp-ai-2"),
+      getOnboardingFileRecord("pfp-ai-3"),
     ])
-      .then(([originalRecord, generatedRecord]) => {
+      .then(([originalRecord, generatedRecord1, generatedRecord2, generatedRecord3]) => {
         if (isCancelled) {
           return;
         }
 
         setPreviewFile("original", originalRecord?.file ?? null);
-        setPreviewFile("generated", generatedRecord?.file ?? null);
+        [generatedRecord1, generatedRecord2, generatedRecord3].forEach((record, index) => {
+          setPreviewFile("generated", record?.file ?? null, index);
+        });
       })
       .finally(() => {
         if (!isCancelled) {
@@ -104,31 +124,31 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
   useEffect(() => {
     return () => {
       revokeUrl(originalPreviewUrl);
-      revokeUrl(generatedPreviewUrl);
+      generatedPreviewUrls.forEach((url) => revokeUrl(url));
     };
-  }, [generatedPreviewUrl, originalPreviewUrl]);
+  }, [generatedPreviewUrls, originalPreviewUrl]);
 
   return {
     isHydratingFiles: enabled && !hasHydratedFiles,
     originalFile,
-    generatedFile,
+    generatedFiles,
     originalPreviewUrl,
-    generatedPreviewUrl,
+    generatedPreviewUrls,
     replaceFiles,
     setOriginalFile: useCallback(
       async (file: File | null) => {
         await replaceFiles({
           original: file,
-          generated: null,
+          generated: [null, null, null],
         });
       },
       [replaceFiles],
     ),
-    setGeneratedFile: useCallback(
-      async (file: File | null) => {
+    setGeneratedFiles: useCallback(
+      async (files: [File | null, File | null, File | null]) => {
         await replaceFiles({
           original: originalFile,
-          generated: file,
+          generated: files,
         });
       },
       [originalFile, replaceFiles],
@@ -136,7 +156,7 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
     clearFiles: useCallback(async () => {
       await replaceFiles({
         original: null,
-        generated: null,
+        generated: [null, null, null],
       });
     }, [replaceFiles]),
   };

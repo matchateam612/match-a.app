@@ -34,9 +34,8 @@ export async function readStoredPictureStateFromIdb(): Promise<StoredPictureStat
 export async function persistPictureStateToIdb(args: {
   draft: PictureDraft;
   progress: number;
-  selectedVariant: "original" | "aiTransformed";
 }) {
-  const { draft, progress, selectedVariant } = args;
+  const { draft, progress } = args;
 
   await updateOnboardingMetaRecord((current) => ({
     ...current,
@@ -48,7 +47,6 @@ export async function persistPictureStateToIdb(args: {
         completed: Boolean(draft.fileName && draft.mimeType),
         metadata: {
           ...draft,
-          selectedVariant,
         },
       },
     },
@@ -61,9 +59,8 @@ export function hasPictureDraftContent(draft: PictureDraft) {
   return Boolean(
     draft.fileName ||
     draft.source ||
-    draft.prompt1.trim() ||
-    draft.prompt2.trim() ||
-    draft.prompt3.trim()
+    draft.originalAssetKey ||
+    draft.generatedAssetKey
   );
 }
 

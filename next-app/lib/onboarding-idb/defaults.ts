@@ -61,7 +61,6 @@ export function createDefaultOnboardingMetaRecord(): OnboardingMetaRecord {
         completed: false,
         metadata: {
           ...pictureInitialDraft,
-          selectedVariant: "original",
         },
         galleryOrder: [],
       },

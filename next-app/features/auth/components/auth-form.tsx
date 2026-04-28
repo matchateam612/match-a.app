@@ -21,6 +21,7 @@ import { AuthMethods } from "./auth-methods";
 import { PasswordField } from "./password-field";
 import { TermsModal } from "./terms-modal";
 import { getCurrentUserSystemState, getRouteForOnboardingStatus } from "@/lib/supabase/user-system-state";
+import { syncPromoCodeForCurrentUser } from "@/lib/promo/promo-code";
 
 type AuthFormProps = {
   initialMessage?: string;
@@ -62,6 +63,12 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
         const user = await getCurrentUser();
 
         if (user && isActive) {
+          try {
+            await syncPromoCodeForCurrentUser();
+          } catch {
+            // Promo sync should not block auth recovery or normal routing.
+          }
+
           const systemState = await getCurrentUserSystemState();
 
           if (!systemState) {
@@ -105,6 +112,11 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
           email: formState.email,
           password: formState.password,
         });
+        try {
+          await syncPromoCodeForCurrentUser();
+        } catch {
+          // Promo sync is best-effort and should not block sign-in.
+        }
         const systemState = await getCurrentUserSystemState();
 
         if (!systemState) {
@@ -125,6 +137,11 @@ export function AuthForm({ initialMessage = "", mode }: AuthFormProps) {
       });
 
       if (data.session) {
+        try {
+          await syncPromoCodeForCurrentUser();
+        } catch {
+          // Promo sync is best-effort and should not block onboarding entry.
+        }
         router.push("/onboarding/1-basics");
         return;
       }

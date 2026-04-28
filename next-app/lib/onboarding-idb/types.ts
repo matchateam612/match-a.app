@@ -19,7 +19,9 @@ export const ONBOARDING_SYNC_ID = "sync";
 
 export type OnboardingFileRecordId =
   | "pfp-original"
-  | "pfp-ai"
+  | "pfp-ai-1"
+  | "pfp-ai-2"
+  | "pfp-ai-3"
   | `gallery-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`;
 
 export type OnboardingMetaRecord = {

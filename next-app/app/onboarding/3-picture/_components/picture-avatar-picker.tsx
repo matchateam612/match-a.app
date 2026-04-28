@@ -4,7 +4,6 @@ import styles from "../../_shared/onboarding-shell.module.scss";
 import pictureStyles from "./picture.module.scss";
 
 type AvatarOption = {
-  file: File;
   previewUrl: string;
 };
 

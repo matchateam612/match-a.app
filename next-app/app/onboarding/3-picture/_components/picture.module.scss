@@ -34,6 +34,10 @@
   min-height: 96px;
 }
 
+.sourceSingleButton {
+  width: 100%;
+}
+
 .splitCard {
   gap: 12px;
 }
@@ -239,6 +243,51 @@
 .pickerCard {
   display: grid;
   gap: 8px;
+}
+
+.photoStepStack {
+  display: grid;
+  gap: 10px;
+}
+
+.photoPlaceholderCard {
+  min-height: 0;
+  justify-items: start;
+}
+
+.inlinePhotoButton {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.loadingCard {
+  min-height: 320px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.loadingOrb {
+  width: 84px;
+  height: 84px;
+  border: 6px solid color-mix(in srgb, var(--color-brand-primary) 16%, transparent);
+  border-top-color: var(--color-brand-primary);
+  border-radius: 999px;
+  animation: picture-spin 0.9s linear infinite;
+}
+
+.loadingTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+@keyframes picture-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .footerCompact {

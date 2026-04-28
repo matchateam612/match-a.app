@@ -238,7 +238,7 @@ export async function migrateLegacyOnboardingStorageIfNeeded() {
 
   if (legacyPictureDraft?.generatedFile) {
     await setOnboardingFileRecord({
-      id: "pfp-ai",
+      id: "pfp-ai-1",
       file: legacyPictureDraft.generatedFile,
       updatedAt: importedAt,
     });

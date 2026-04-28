@@ -28,8 +28,8 @@ export function PicturePhotoReviewCard({
         className={pictureStyles.reviewImage}
       />
       <p className={styles.helper}>
-        This photo becomes the base for your avatar set. If it does not feel right, go back and
-        pick a different one.
+        This photo becomes the base for your avatar set. You can replace it before generating, and
+        your existing avatars will only be reused if this same local photo stays selected.
       </p>
     </div>
   );

@@ -50,3 +50,21 @@ export async function advanceUserOnboardingStatus(userId: string, nextStatus: On
 
   return data as UserSystemStateRow;
 }
+
+export async function updateUserPromotedBy(userId: string, code: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("user_system_state")
+    .update({
+      promoted_by: code.trim() || null,
+    })
+    .eq("user_id", userId)
+    .select("user_id, onboarding_status, tier, promoted_by, report_flags, created_at, updated_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as UserSystemStateRow;
+}

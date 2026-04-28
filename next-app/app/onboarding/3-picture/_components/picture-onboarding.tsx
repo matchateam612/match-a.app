@@ -18,6 +18,7 @@ import {
   uploadProfilePictureRequest,
 } from "@/lib/pictures/picture-api";
 import {
+  AVATAR_GENERATION_PROMPTS,
   initialDraft,
   MAX_GALLERY_PHOTOS,
   TOTAL_STEPS,
@@ -49,10 +50,9 @@ function createEmptyGallerySlots(): GalleryPictureSlot[] {
   }));
 }
 
-type GeneratedAvatarOption = {
-  file: File;
-  previewUrl: string;
-};
+function createPictureAssetKey(file: File) {
+  return [file.name, file.size, file.lastModified, file.type].join(":");
+}
 
 export function PictureOnboarding() {
   const isClientReady = useClientReady();
@@ -79,7 +79,7 @@ export function PictureOnboarding() {
               type="button"
               disabled
             >
-              Finish picture
+              Continue
             </button>
           </>
         }
@@ -95,11 +95,8 @@ export function PictureOnboarding() {
 function PictureOnboardingClient() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const captureInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const galleryUploadSlotRef = useRef<number | null>(null);
-  const [generatedAvatarOptions, setGeneratedAvatarOptions] = useState<GeneratedAvatarOption[]>([]);
-  const [selectedAvatarIndex, setSelectedAvatarIndex] = useState(0);
   const [gallerySlots, setGallerySlots] = useState<GalleryPictureSlot[]>(() => createEmptyGallerySlots());
   const [isLoadingGallery, setIsLoadingGallery] = useState(true);
   const [isHydratingMeta, setIsHydratingMeta] = useState(true);
@@ -107,7 +104,7 @@ function PictureOnboardingClient() {
   const [progress, setCurrentStep] = useState(0);
   const [restoredHasSavedDraft, setRestoredHasSavedDraft] = useState(false);
   const [isSavingSection, setIsSavingSection] = useState(false);
-  const [isTransformingImage, setIsTransformingImage] = useState(false);
+  const [isUploadingNewPhoto, setIsUploadingNewPhoto] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
@@ -118,20 +115,14 @@ function PictureOnboardingClient() {
   const {
     isHydratingFiles,
     originalFile,
-    generatedFile,
+    generatedFiles,
     originalPreviewUrl,
-    setGeneratedFile,
+    generatedPreviewUrls,
     replaceFiles,
-    clearFiles,
   } = usePictureDraftFiles({
     enabled: true,
   });
   const currentStep = Math.min(Math.max(progress, 0), TOTAL_STEPS - 1);
-
-  const avatarPrompts = useMemo(
-    () => [draft.prompt1, draft.prompt2, draft.prompt3].filter((prompt) => prompt.trim().length > 0),
-    [draft.prompt1, draft.prompt2, draft.prompt3],
-  );
 
   useEffect(() => {
     let isCancelled = false;
@@ -167,12 +158,9 @@ function PictureOnboardingClient() {
       return;
     }
 
-    const selectedVariant = draft.hasGeneratedImage ? "aiTransformed" : "original";
-
     void persistPictureStateToIdb({
       draft,
       progress,
-      selectedVariant,
     }).catch(() => {
       setSaveError("We couldn't save your picture draft on this device.");
     });
@@ -244,24 +232,7 @@ function PictureOnboardingClient() {
     }
   }, [currentStep, isHydratingFiles, originalFile]);
 
-  useEffect(() => {
-    const selectedOption = generatedAvatarOptions[selectedAvatarIndex];
-
-    if (!selectedOption) {
-      return;
-    }
-
-    void setGeneratedFile(selectedOption.file);
-  }, [generatedAvatarOptions, selectedAvatarIndex, setGeneratedFile]);
-
-  useEffect(() => {
-    return () => {
-      generatedAvatarOptions.forEach((option) => URL.revokeObjectURL(option.previewUrl));
-    };
-  }, [generatedAvatarOptions]);
-
   const hasSavedDraft = useMemo(() => hasPictureDraftContent(draft), [draft]);
-
   const draftStatus = useMemo(() => {
     if (isHydratingMeta) {
       return "Preparing your saved picture draft...";
@@ -272,81 +243,81 @@ function PictureOnboardingClient() {
       : "Your picture draft will be saved on this device.";
   }, [hasSavedDraft, isHydratingMeta]);
 
-  const canGenerateAvatars =
-    Boolean(originalFile) &&
-    avatarPrompts.length === 3 &&
-    !isTransformingImage &&
-    !isSavingSection &&
-    !isHydratingFiles &&
-    !isHydratingMeta;
-  const canGoToGallery =
-    generatedAvatarOptions.length === avatarPrompts.length &&
-    generatedAvatarOptions.length > 0 &&
-    !isTransformingImage;
-  const canContinue = useMemo(
+  const hasGeneratedAvatars = useMemo(
     () =>
-      isPictureReady(draft) &&
-      Boolean(originalFile) &&
-      Boolean(generatedAvatarOptions[selectedAvatarIndex]?.file ?? generatedFile ?? originalFile) &&
-      !isTransformingImage &&
-      !isHydratingFiles &&
-      !isHydratingMeta,
-    [
-      draft,
-      generatedAvatarOptions,
-      generatedFile,
-      isHydratingFiles,
-      isHydratingMeta,
-      isTransformingImage,
-      originalFile,
-      selectedAvatarIndex,
-    ],
+      draft.generatedAssetKey.length > 0 &&
+      draft.generatedAssetKey === draft.originalAssetKey &&
+      generatedFiles.some((file) => Boolean(file)),
+    [draft.generatedAssetKey, draft.originalAssetKey, generatedFiles],
   );
 
-  const resetGeneratedAvatars = useCallback(() => {
-    setGeneratedAvatarOptions((current) => {
-      current.forEach((option) => URL.revokeObjectURL(option.previewUrl));
-      return [];
-    });
-    setSelectedAvatarIndex(0);
-  }, []);
+  const selectedAvatarIndex = Math.min(
+    Math.max(draft.selectedAvatarIndex, 0),
+    Math.max(generatedPreviewUrls.length - 1, 0),
+  );
+  const selectedAvatarFile =
+    generatedFiles[selectedAvatarIndex] ?? generatedFiles.find((file) => Boolean(file)) ?? null;
+  const canGenerate = Boolean(originalFile) && !isUploadingNewPhoto && !isSavingSection && !isHydratingFiles;
+  const canContinueFromAvatarPage =
+    draft.generationStatus === "success" && generatedPreviewUrls.some((url) => Boolean(url));
+  const canFinish = useMemo(
+    () =>
+      isPictureReady(draft) &&
+      Boolean(selectedAvatarFile ?? originalFile) &&
+      draft.generationStatus === "success" &&
+      !isSavingSection,
+    [draft, isSavingSection, originalFile, selectedAvatarFile],
+  );
+
+  const syncGeneratedState = useCallback(
+    (updates: Partial<PictureDraft>) => {
+      setDraft((current) => ({
+        ...current,
+        ...updates,
+      }));
+    },
+    [],
+  );
 
   const applyPicture = useCallback(
     async (file: File, source: PictureSource) => {
       clearSaveFeedback();
+      setIsUploadingNewPhoto(true);
 
       try {
         const prepared = await preparePictureFile(file);
+        const originalAssetKey = createPictureAssetKey(prepared.file);
 
         await replaceFiles({
           original: prepared.file,
-          generated: null,
+          generated: [null, null, null],
         });
-        resetGeneratedAvatars();
-        setDraft((current) => ({
-          ...current,
+
+        setDraft({
+          ...initialDraft,
           source,
           fileName: prepared.file.name,
           mimeType: prepared.file.type,
           width: prepared.width,
           height: prepared.height,
-          transformedAt: "",
-          hasGeneratedImage: false,
-        }));
-        setCurrentStep(1);
+          originalAssetKey,
+        });
+        setCurrentStep(0);
       } catch (error) {
         setSaveError(
           error instanceof Error && error.message
             ? error.message
             : "We couldn't prepare that photo right now.",
         );
+      } finally {
+        setIsUploadingNewPhoto(false);
       }
     },
-    [clearSaveFeedback, replaceFiles, resetGeneratedAvatars, setSaveError],
+    [clearSaveFeedback, replaceFiles, setSaveError],
   );
 
   const onFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>, source: PictureSource) => {
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
 
       if (!file) {
@@ -360,13 +331,8 @@ function PictureOnboardingClient() {
       }
 
       try {
+        const source: PictureSource = file.name ? "upload" : "camera";
         await applyPicture(file, source);
-      } catch (error) {
-        setSaveError(
-          error instanceof Error && error.message
-            ? error.message
-            : "We couldn't read that photo right now.",
-        );
       } finally {
         event.target.value = "";
       }
@@ -431,69 +397,66 @@ function PictureOnboardingClient() {
     [clearSaveFeedback, setSaveError, setSaveMessage],
   );
 
-  const runAiTransform = useCallback(async () => {
-    if (!originalFile || isTransformingImage || isSavingSection || avatarPrompts.length !== 3) {
+  const startAvatarGeneration = useCallback(async () => {
+    if (!originalFile || isSavingSection || isUploadingNewPhoto) {
       return;
     }
 
     clearSaveFeedback();
-    setIsTransformingImage(true);
+    setCurrentStep(1);
+
+    if (hasGeneratedAvatars) {
+      syncGeneratedState({
+        generationStatus: "success",
+        generationError: "",
+      });
+      return;
+    }
+
+    syncGeneratedState({
+      generationStatus: "loading",
+      generationError: "",
+      generatedAssetKey: "",
+      selectedAvatarIndex: 0,
+    });
 
     try {
-      const nextOptions: GeneratedAvatarOption[] = [];
+      const nextFiles = (await Promise.all(
+        AVATAR_GENERATION_PROMPTS.map((prompt) => transformPictureWithAi(originalFile, prompt)),
+      )) as [File, File, File];
 
-      for (const prompt of avatarPrompts) {
-        const transformed = await transformPictureWithAi(originalFile, prompt);
-        nextOptions.push({
-          file: transformed,
-          previewUrl: URL.createObjectURL(transformed),
-        });
-      }
+      await replaceFiles({
+        original: originalFile,
+        generated: nextFiles,
+      });
 
-      resetGeneratedAvatars();
-      setGeneratedAvatarOptions(nextOptions);
-      setSelectedAvatarIndex(0);
-      await setGeneratedFile(nextOptions[0]?.file ?? null);
-      setDraft((current) => ({
-        ...current,
-        transformedAt: new Date().toISOString(),
-        hasGeneratedImage: true,
-      }));
-      setSaveMessage("Your avatar set is ready. Pick the version you like best.");
-      setCurrentStep(2);
+      syncGeneratedState({
+        generationStatus: "success",
+        generationError: "",
+        generatedAssetKey: draft.originalAssetKey,
+        selectedAvatarIndex: 0,
+      });
+      setSaveMessage("Your avatar set is ready.");
     } catch (error) {
-      setSaveError(
-        error instanceof Error && error.message
-          ? error.message
-          : "We couldn't generate the avatar set right now.",
-      );
-    } finally {
-      setIsTransformingImage(false);
+      syncGeneratedState({
+        generationStatus: "error",
+        generationError:
+          error instanceof Error && error.message
+            ? error.message
+            : "We couldn't generate avatars right now.",
+      });
     }
   }, [
-    avatarPrompts,
     clearSaveFeedback,
+    draft.originalAssetKey,
+    hasGeneratedAvatars,
     isSavingSection,
-    isTransformingImage,
+    isUploadingNewPhoto,
     originalFile,
-    resetGeneratedAvatars,
-    setGeneratedFile,
-    setSaveError,
+    replaceFiles,
     setSaveMessage,
+    syncGeneratedState,
   ]);
-
-  const resetPhoto = useCallback(() => {
-    clearSaveFeedback();
-    void clearFiles();
-    resetGeneratedAvatars();
-    setDraft(initialDraft);
-    setCurrentStep(0);
-  }, [clearFiles, clearSaveFeedback, resetGeneratedAvatars]);
-
-  const openGalleryUpload = useCallback((slot: number) => {
-    galleryUploadSlotRef.current = slot;
-    galleryInputRef.current?.click();
-  }, []);
 
   const removeGalleryPhoto = useCallback(
     async (slot: number) => {
@@ -537,7 +500,7 @@ function PictureOnboardingClient() {
   );
 
   const finishPicture = useCallback(async () => {
-    if (!canContinue || isSavingSection) {
+    if (!canFinish || isSavingSection) {
       return;
     }
 
@@ -552,8 +515,7 @@ function PictureOnboardingClient() {
         throw new Error("Please sign in before finishing this section.");
       }
 
-      const fileToUpload =
-        generatedAvatarOptions[selectedAvatarIndex]?.file ?? generatedFile ?? originalFile;
+      const fileToUpload = selectedAvatarFile ?? originalFile;
 
       if (!fileToUpload) {
         throw new Error("Please add a photo before finishing this section.");
@@ -577,13 +539,11 @@ function PictureOnboardingClient() {
       setIsSavingSection(false);
     }
   }, [
-    canContinue,
-    generatedAvatarOptions,
-    generatedFile,
+    canFinish,
     isSavingSection,
     originalFile,
     router,
-    selectedAvatarIndex,
+    selectedAvatarFile,
   ]);
 
   const goBack = useCallback(() => {
@@ -593,50 +553,27 @@ function PictureOnboardingClient() {
     }
 
     if (currentStep === 1) {
-      resetPhoto();
+      setCurrentStep(0);
       return;
     }
 
-    setCurrentStep(currentStep - 1);
-  }, [currentStep, resetPhoto, router]);
+    setCurrentStep(1);
+  }, [currentStep, router]);
 
-  const goNext = useCallback(() => {
-    if (currentStep === 1) {
-      if (!canGenerateAvatars) {
-        return;
-      }
-
-      void runAiTransform();
-      return;
-    }
-
-    if (currentStep === 2) {
-      if (!canGoToGallery) {
-        return;
-      }
-
-      setCurrentStep(3);
-    }
-  }, [canGenerateAvatars, canGoToGallery, currentStep, runAiTransform]);
-
-  const interactionDisabled =
-    isTransformingImage || isSavingSection || isHydratingFiles || isHydratingMeta;
+  const choosePhotoLabel = originalFile ? "Replace photo" : "Take photo / Upload photo";
+  const interactionDisabled = isSavingSection || isHydratingFiles || isHydratingMeta || isUploadingNewPhoto;
 
   return (
     <div className={pictureStyles.mobilePanel}>
       <PictureLayout
         currentStep={currentStep}
-        draftStatus={
-          isHydratingFiles
-            ? "Restoring your saved photo draft..."
-            : draftStatus
-        }
+        draftStatus={isHydratingFiles ? "Restoring your saved photo draft..." : draftStatus}
         panelClassName={pictureStyles.panelCard}
         questionBlockClassName={pictureStyles.questionBlock}
         footerClassName={pictureStyles.footerCompact}
         status={
           <OnboardingSectionStatus
-            errorMessage={saveError}
+            errorMessage={saveError || (draft.generationStatus === "error" ? draft.generationError : "")}
             successMessage={saveMessage}
             errorClassName={`${styles.statusMessage} ${styles.statusError}`}
             successClassName={`${styles.statusMessage} ${styles.statusSuccess}`}
@@ -652,29 +589,41 @@ function PictureOnboardingClient() {
             >
               Back
             </button>
-            {currentStep < TOTAL_STEPS - 1 ? (
+            {currentStep === 0 ? (
               <button
                 className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
                 type="button"
-                onClick={goNext}
-                disabled={
-                  currentStep === 0
-                    ? true
-                    : currentStep === 1
-                      ? !canGenerateAvatars || isSavingSection
-                      : !canGoToGallery || isSavingSection
-                }
+                onClick={() => void startAvatarGeneration()}
+                disabled={!canGenerate}
               >
-                {currentStep === 1
-                  ? (isTransformingImage ? "Generating..." : "Generate avatar based on this photo")
-                  : "Proceed to gallery"}
+                {isUploadingNewPhoto ? "Preparing..." : "Generate AI"}
               </button>
+            ) : currentStep === 1 ? (
+              draft.generationStatus === "success" ? (
+                <button
+                  className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  disabled={!canContinueFromAvatarPage}
+                >
+                  Continue to gallery
+                </button>
+              ) : (
+                <button
+                  className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
+                  type="button"
+                  onClick={() => void startAvatarGeneration()}
+                  disabled={draft.generationStatus === "loading" || !originalFile}
+                >
+                  {draft.generationStatus === "loading" ? "Generating..." : "Retry"}
+                </button>
+              )
             ) : (
               <button
                 className={`${styles.nextButton} ${pictureStyles.compactButton} ${pictureStyles.compactNextButton}`.trim()}
                 type="button"
                 onClick={finishPicture}
-                disabled={!canContinue || isSavingSection}
+                disabled={!canFinish}
               >
                 {isSavingSection ? "Saving..." : "Finish picture"}
               </button>
@@ -689,15 +638,8 @@ function PictureOnboardingClient() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={(event) => void onFileChange(event, "upload")}
-            hidden
-          />
-          <input
-            ref={captureInputRef}
-            type="file"
-            accept="image/*"
             capture="user"
-            onChange={(event) => void onFileChange(event, "camera")}
+            onChange={onFileChange}
             hidden
           />
           <input
@@ -709,41 +651,76 @@ function PictureOnboardingClient() {
           />
 
           {currentStep === 0 ? (
-            <PictureSourcePicker
-              disabled={interactionDisabled}
-              onTakePhotoClick={() => captureInputRef.current?.click()}
-              onChooseLibraryClick={() => fileInputRef.current?.click()}
-            />
+            <div className={pictureStyles.photoStepStack}>
+              <PictureSourcePicker
+                disabled={interactionDisabled}
+                onChoosePhotoClick={() => fileInputRef.current?.click()}
+              />
+              {originalPreviewUrl ? (
+                <PicturePhotoReviewCard draft={draft} previewUrl={originalPreviewUrl} />
+              ) : (
+                <div className={`${styles.stackCard} ${pictureStyles.photoPlaceholderCard}`.trim()}>
+                  <span className={styles.inlineLabel}>Your photo preview</span>
+                  <p className={styles.helper}>
+                    Pick a clear photo with your face visible. We will use it as the base for your
+                    avatar set.
+                  </p>
+                  <button
+                    className={`${styles.secondaryButton} ${pictureStyles.inlinePhotoButton}`.trim()}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={interactionDisabled}
+                  >
+                    {choosePhotoLabel}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : null}
 
-          {currentStep === 1 && originalPreviewUrl ? (
-            <PicturePhotoReviewCard
-              draft={draft}
-              previewUrl={originalPreviewUrl}
-            />
-          ) : null}
-
-          {currentStep === 2 ? (
-            generatedAvatarOptions.length > 0 ? (
+          {currentStep === 1 ? (
+            draft.generationStatus === "loading" ? (
+              <div className={`${styles.stackCard} ${pictureStyles.loadingCard}`.trim()}>
+                <span className={styles.inlineLabel}>Generating avatars</span>
+                <div className={pictureStyles.loadingOrb} aria-hidden="true" />
+                <p className={pictureStyles.loadingTitle}>We’re building your avatar set now.</p>
+                <p className={styles.helper}>
+                  This usually takes a moment. Stay on this page while we prepare the three versions.
+                </p>
+              </div>
+            ) : draft.generationStatus === "success" ? (
               <PictureAvatarPicker
-                options={generatedAvatarOptions}
+                options={generatedPreviewUrls
+                  .filter((previewUrl): previewUrl is string => Boolean(previewUrl))
+                  .map((previewUrl) => ({ previewUrl }))}
                 selectedIndex={selectedAvatarIndex}
-                onSelect={setSelectedAvatarIndex}
+                onSelect={(index) =>
+                  setDraft((current) => ({
+                    ...current,
+                    selectedAvatarIndex: index,
+                  }))
+                }
               />
             ) : (
-              <div className={`${styles.stackCard} ${pictureStyles.stackCard}`.trim()}>
-                <span className={styles.inlineLabel}>Avatar set</span>
-                <p className={styles.helper}>Generate your three avatar options to continue.</p>
+              <div className={`${styles.stackCard} ${pictureStyles.loadingCard}`.trim()}>
+                <span className={styles.inlineLabel}>Avatar generation</span>
+                <p className={pictureStyles.loadingTitle}>We couldn’t finish your avatar set.</p>
+                <p className={styles.helper}>
+                  Retry from here, or go back to swap the photo while keeping your current draft.
+                </p>
               </div>
             )
           ) : null}
 
-          {currentStep === 3 ? (
+          {currentStep === 2 ? (
             <PictureGalleryCard
               slots={gallerySlots}
-              disabled={isTransformingImage || isSavingSection}
+              disabled={isSavingSection}
               isLoading={isLoadingGallery}
-              onUploadClick={openGalleryUpload}
+              onUploadClick={(slot) => {
+                galleryUploadSlotRef.current = slot;
+                galleryInputRef.current?.click();
+              }}
               onDeleteClick={removeGalleryPhoto}
             />
           ) : null}
