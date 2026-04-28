@@ -69,61 +69,16 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const showComposer = status !== "confirming" && status !== "complete";
 
-    return (
-      <div
-      className={`${styles.stackCard} ${styles.agentSurface}`.trim()}
-      style={{
-        gap: 16,
-        padding: 18,
-        border: "1px solid rgba(29, 78, 216, 0.08)",
-        background: "#eef4ff",
-      }}
-    >
-      <div className={`${styles.rowBetween} ${styles.rowWrap}`.trim()}>
-        <div>
-          <span className={styles.inlineLabel}>AI conversation</span>
-          <p className={styles.helper} style={{ marginTop: 6, marginBottom: 0 }}>
-            One transcript, one summary engine, and a switchable input method.
-          </p>
-        </div>
-        <div className={styles.rowWrap}>
-          {selectedMode ? (
-            <span className={styles.selectionSummary}>
-              {selectedMode === "text" ? "Text-first" : "Voice-first"} · {status}
-            </span>
-          ) : null}
-          {selectedMode === "voice" ? (
-            <button
-              type="button"
-              className={`${styles.backButton} ${styles.inlineButtonIcon}`.trim()}
-              onClick={onToggleSpeechMute}
-            >
-              {isSpeechMuted ? <SpeakerMutedIcon /> : <SpeakerIcon />}
-              {isSpeechMuted ? "Unmute" : "Mute"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
+  return (
+    <div className={styles.agentChatPanel}>
       <TranscriptMessageList transcript={transcript} pendingAssistantMessage={pendingAssistantMessage} />
 
       {status === "confirming" ? (
-        <div
-          className={styles.stackCard}
-          style={{
-            border: "1px solid rgba(16, 185, 129, 0.18)",
-            background: "linear-gradient(180deg, rgba(236, 253, 245, 0.92), #ffffff)",
-          }}
-        >
+        <div className={styles.agentConfirmCard}>
           <span className={styles.inlineLabel}>Ready to finish</span>
-          <p style={{ marginTop: 0, marginBottom: 8 }}>
-            The chat is ready to wrap with the current summary.
-          </p>
+          <p style={{ marginTop: 0, marginBottom: 8 }}>The chat is ready to wrap with the current summary.</p>
           {finalSummary ? <p style={{ marginTop: 0, marginBottom: 8 }}>{finalSummary}</p> : null}
-          <p className={styles.helper} style={{ marginTop: 0 }}>
-            If this summary matches what the user meant, confirm and end the onboarding chat.
-          </p>
-          <div className={styles.rowEnd}>
+          <div className={styles.agentConfirmActions}>
             <button type="button" className={styles.nextButton} onClick={onConfirmConversation}>
               Confirm and finish
             </button>
@@ -143,6 +98,17 @@ export function ChatPanel({
           onRetryVoiceDraft={onRetryVoiceDraft}
           onDiscardVoiceDraft={onDiscardVoiceDraft}
         />
+      ) : null}
+
+      {selectedMode === "voice" ? (
+        <button
+          type="button"
+          className={styles.agentChatMuteButton}
+          onClick={onToggleSpeechMute}
+          aria-label={isSpeechMuted ? "Unmute spoken replies" : "Mute spoken replies"}
+        >
+          {isSpeechMuted ? <SpeakerMutedIcon /> : <SpeakerIcon />}
+        </button>
       ) : null}
     </div>
   );

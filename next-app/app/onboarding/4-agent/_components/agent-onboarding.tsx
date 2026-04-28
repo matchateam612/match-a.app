@@ -502,112 +502,139 @@ function AgentOnboardingClient() {
   }
 
   return (
-    <AgentLayout
-      eyebrow="Section 4"
-      title="Agent onboarding"
-      description="One shared chat screen, with text-first or voice-first behavior depending on the style you picked."
-      status={
-        <OnboardingSectionStatus
-          errorMessage={saveError}
-          successMessage={saveMessage || draftStatus}
-          errorClassName={`${styles.statusMessage} ${styles.statusError}`}
-          successClassName={`${styles.statusMessage} ${styles.statusSuccess}`}
-        />
-      }
-      footer={
-        <>
-          <button
-            className={styles.backButton}
-            type="button"
-            onClick={() => router.push("/onboarding/4-agent")}
-            disabled={isHydrating}
-          >
-            Back
-          </button>
-          <button
-            className={styles.nextButton}
-            type="button"
-            onClick={() => void saveAgentProfile()}
-            disabled={isHydrating}
-          >
-            Save progress
-          </button>
-        </>
-      }
-    >
-      <ChatPanel
-        selectedMode={draft.selectedMode}
-        currentInputMode={currentInputMode}
-        status={draft.status}
-        transcript={draft.transcript}
-        pendingAssistantMessage={pendingAssistantMessage}
-        finalSummary={draft.finalSummary}
-        isSubmittingTurn={isSubmittingTurn || isPreparingConversation || turnLimitReached}
-        isSpeechMuted={isSpeechMuted}
-        pendingVoiceDraft={pendingVoiceDraft ? { url: pendingVoiceDraft.url, error: pendingVoiceDraft.error } : null}
-        onSetInputMode={setCurrentInputMode}
-        onSubmitTextTurn={onSubmitTextTurn}
-        onSubmitVoiceBlob={onSubmitVoiceBlob}
-        onRetryVoiceDraft={onRetryVoiceDraft}
-        onDiscardVoiceDraft={onDiscardVoiceDraft}
-        onToggleSpeechMute={() => {
-          setIsSpeechMuted((current) => !current);
-        }}
-        onConfirmConversation={() => {
-          cancelSpeech();
-          setDraft((current) => ({
-            ...current,
-            status: "complete",
-            completedAt: new Date().toISOString(),
-          }));
-          setProgress("complete");
-          setSaveMessage("Conversation confirmed.");
-        }}
-      />
+    <main className={styles.agentChatPage}>
+      <header className={styles.agentChatHeader}>
+        <button
+          className={styles.backButton}
+          type="button"
+          onClick={() => router.push("/onboarding/4-agent")}
+          disabled={isHydrating}
+        >
+          Back
+        </button>
+        <div className={styles.agentChatHeaderTitle}>
+          <span className={styles.agentChatSectionLabel}>Section 4</span>
+        </div>
+        <button
+          className={styles.agentChatSaveButton}
+          type="button"
+          onClick={() => void saveAgentProfile()}
+          disabled={isHydrating}
+        >
+          Save
+        </button>
+      </header>
 
-      <AgentSummaryCard criteria={draft.criteria} finalSummary={draft.finalSummary} />
-
-      <CompletionReview
-        draftSummary={draftSummary}
-        onApplySummary={() => {
-          cancelSpeech();
-          setDraft((current) => ({
-            ...current,
-            status: "confirming",
-            finalSummary: draftSummary,
-          }));
-          setProgress("confirming");
-          setSaveMessage("Draft summary applied. Review it before saving.");
-        }}
-      />
-
-      <details className={styles.debugPanel}>
-        <summary className={styles.debugSummary}>Conversation debug view</summary>
-        <div className={styles.debugCard}>
-          <span className={styles.inlineLabel}>Stored criteria JSON</span>
-          <textarea
-            className={styles.input}
-            value={criteriaJson}
-            readOnly
-            rows={14}
-            style={{ minHeight: 280, fontFamily: "monospace", resize: "vertical" }}
+      <div className={styles.agentChatBody}>
+        {(saveError || saveMessage || draftStatus) ? (
+          <OnboardingSectionStatus
+            errorMessage={saveError}
+            successMessage={saveError ? "" : saveMessage || draftStatus}
+            errorClassName={`${styles.agentChatStatus} ${styles.statusError}`}
+            successClassName={`${styles.agentChatStatus} ${styles.agentChatStatusSoft}`}
           />
-          <p className={styles.helper}>
-            Use this testing view to inspect the extracted criteria model and tune the conversation logic.
-          </p>
-        </div>
+        ) : null}
 
-        <div className={styles.debugCard}>
-          <span className={styles.inlineLabel}>Progress diagnostics</span>
-          <p style={{ marginTop: 0, marginBottom: 8 }}>Session status: {progress}</p>
-          <p style={{ marginTop: 0, marginBottom: 0 }}>Turns so far: {draft.turnCount}</p>
-          {turnLimitReached ? (
-            <p className={styles.helper} style={{ marginTop: 8, marginBottom: 0 }}>
-              The 20-turn limit has been reached, so the current summary is being used for the final review step.
-            </p>
-          ) : null}
-        </div>
-      </details>
-    </AgentLayout>
+        {draft.status === "collecting" && draft.transcript.length > 0 ? (
+          <div className={styles.agentChatInlineActions}>
+            <button
+              type="button"
+              className={styles.agentChatGhostButton}
+              onClick={() => {
+                cancelSpeech();
+                setDraft((current) => ({
+                  ...current,
+                  status: "confirming",
+                  finalSummary: draftSummary,
+                }));
+                setProgress("confirming");
+                setSaveMessage("Draft summary applied. Review it before saving.");
+              }}
+            >
+              Review summary
+            </button>
+          </div>
+        ) : null}
+
+        <ChatPanel
+          selectedMode={draft.selectedMode}
+          currentInputMode={currentInputMode}
+          status={draft.status}
+          transcript={draft.transcript}
+          pendingAssistantMessage={pendingAssistantMessage}
+          finalSummary={draft.finalSummary}
+          isSubmittingTurn={isSubmittingTurn || isPreparingConversation || turnLimitReached}
+          isSpeechMuted={isSpeechMuted}
+          pendingVoiceDraft={pendingVoiceDraft ? { url: pendingVoiceDraft.url, error: pendingVoiceDraft.error } : null}
+          onSetInputMode={setCurrentInputMode}
+          onSubmitTextTurn={onSubmitTextTurn}
+          onSubmitVoiceBlob={onSubmitVoiceBlob}
+          onRetryVoiceDraft={onRetryVoiceDraft}
+          onDiscardVoiceDraft={onDiscardVoiceDraft}
+          onToggleSpeechMute={() => {
+            setIsSpeechMuted((current) => !current);
+          }}
+          onConfirmConversation={() => {
+            cancelSpeech();
+            setDraft((current) => ({
+              ...current,
+              status: "complete",
+              completedAt: new Date().toISOString(),
+            }));
+            setProgress("complete");
+            setSaveMessage("Conversation confirmed.");
+          }}
+        />
+
+        <details className={styles.agentChatDetails}>
+          <summary className={styles.agentChatDetailsSummary}>Conversation details</summary>
+          <div className={styles.agentChatDetailsContent}>
+            <AgentSummaryCard criteria={draft.criteria} finalSummary={draft.finalSummary} />
+
+            <CompletionReview
+              draftSummary={draftSummary}
+              onApplySummary={() => {
+                cancelSpeech();
+                setDraft((current) => ({
+                  ...current,
+                  status: "confirming",
+                  finalSummary: draftSummary,
+                }));
+                setProgress("confirming");
+                setSaveMessage("Draft summary applied. Review it before saving.");
+              }}
+            />
+
+            <details className={styles.debugPanel}>
+              <summary className={styles.debugSummary}>Conversation debug view</summary>
+              <div className={styles.debugCard}>
+                <span className={styles.inlineLabel}>Stored criteria JSON</span>
+                <textarea
+                  className={styles.input}
+                  value={criteriaJson}
+                  readOnly
+                  rows={14}
+                  style={{ minHeight: 280, fontFamily: "monospace", resize: "vertical" }}
+                />
+                <p className={styles.helper}>
+                  Use this testing view to inspect the extracted criteria model and tune the conversation logic.
+                </p>
+              </div>
+
+              <div className={styles.debugCard}>
+                <span className={styles.inlineLabel}>Progress diagnostics</span>
+                <p style={{ marginTop: 0, marginBottom: 8 }}>Session status: {progress}</p>
+                <p style={{ marginTop: 0, marginBottom: 0 }}>Turns so far: {draft.turnCount}</p>
+                {turnLimitReached ? (
+                  <p className={styles.helper} style={{ marginTop: 8, marginBottom: 0 }}>
+                    The 20-turn limit has been reached, so the current summary is being used for the final review step.
+                  </p>
+                ) : null}
+              </div>
+            </details>
+          </div>
+        </details>
+      </div>
+    </main>
   );
 }

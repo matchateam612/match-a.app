@@ -562,9 +562,122 @@
   background: linear-gradient(180deg, #f8fafc, #ffffff);
 }
 
+.agentChatPage {
+  min-height: 100dvh;
+  background:
+    linear-gradient(180deg, #edf5ea 0%, #f4f8f2 18%, #f6f7f5 48%, #f7f7f6 100%);
+  color: var(--color-text-primary);
+}
+
+.agentChatHeader {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, #f6f8f4 82%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.agentChatHeaderTitle {
+  display: grid;
+  justify-items: center;
+}
+
+.agentChatSectionLabel {
+  color: rgba(15, 23, 42, 0.4);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agentChatSaveButton {
+  border: 0;
+  padding: 0 6px;
+  background: transparent;
+  color: rgba(15, 23, 42, 0.72);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.agentChatBody {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 58px);
+}
+
+.agentChatStatus {
+  margin: 8px 14px 0;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.agentChatStatusSoft {
+  background: rgba(255, 255, 255, 0.66);
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.agentChatInlineActions {
+  display: flex;
+  justify-content: center;
+  padding: 10px 14px 0;
+}
+
+.agentChatGhostButton {
+  border: 0;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: rgba(15, 23, 42, 0.74);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.agentChatPanel {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.agentTranscriptScroller {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 14px 14px 160px;
+}
+
+.agentTranscriptEmpty {
+  display: grid;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-items: center;
+  padding: 24px 14px 160px;
+}
+
+.agentTranscriptEmptyBubble {
+  max-width: 240px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+}
+
 .chatMessageList {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .chatMessage {
@@ -580,51 +693,259 @@
 }
 
 .chatMessageColumn {
-  width: min(100%, 640px);
+  width: min(100%, 72vw);
   display: grid;
-  gap: 6px;
-}
-
-.chatMessageMeta {
-  display: flex;
-  gap: 10px;
-  font-size: 11px;
-  color: #64748b;
-  text-transform: capitalize;
-}
-
-.chatMessageMetaAssistant {
-  justify-content: flex-start;
-}
-
-.chatMessageMetaUser {
-  justify-content: flex-end;
 }
 
 .chatBubble {
-  padding: 13px 15px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  padding: 12px 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
 }
 
 .chatBubbleAssistant {
-  border-radius: 20px 20px 20px 8px;
-  background: #ffffff;
+  border-radius: 18px 18px 18px 6px;
+  background: rgba(255, 255, 255, 0.96);
   color: var(--color-text-primary);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.04);
 }
 
 .chatBubbleUser {
-  border-radius: 20px 20px 8px 20px;
-  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
-  color: #ffffff;
+  border-radius: 18px 18px 6px 18px;
+  background: #95ec69;
+  color: #163300;
   border: 1px solid transparent;
-  box-shadow: 0 10px 24px rgba(147, 73, 55, 0.18);
+  box-shadow: 0 6px 18px rgba(66, 130, 41, 0.12);
 }
 
 .chatBubbleText {
   margin: 0;
   white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.55;
+  font-size: 0.98rem;
+}
+
+.agentComposerDock {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background:
+    linear-gradient(180deg, rgba(246, 247, 245, 0) 0%, rgba(246, 247, 245, 0.92) 24%, #f6f7f5 100%);
+}
+
+.agentComposerBar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+}
+
+.agentComposerModeButton,
+.agentComposerSendButton {
+  border: 0;
+  background: transparent;
+  color: rgba(15, 23, 42, 0.76);
+  font: inherit;
+}
+
+.agentComposerModeButton {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+.agentComposerInput {
+  width: 100%;
+  min-height: 38px;
+  max-height: 120px;
+  padding: 9px 0 7px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  resize: none;
+}
+
+.agentComposerInput:focus {
+  outline: none;
+}
+
+.agentComposerInput::placeholder {
+  color: rgba(15, 23, 42, 0.38);
+}
+
+.agentComposerSendButton {
+  min-height: 38px;
+  padding: 0 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.agentHoldToTalkButton {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f2f3;
+  color: rgba(15, 23, 42, 0.78);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.agentHoldToTalkCancel {
+  background: #ffe3e3;
+  color: #b91c1c;
+}
+
+.agentHoldToTalkLabel {
+  pointer-events: none;
+}
+
+.agentVoiceRecordingHint {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.agentVoiceWave {
+  display: inline-flex;
+  align-items: end;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.agentVoiceWave span {
+  width: 4px;
+  border-radius: 999px;
+  background: #67c23a;
+  animation: agent-voice-wave 1s ease-in-out infinite;
+}
+
+.agentVoiceWave span:nth-child(1) {
+  height: 10px;
+}
+
+.agentVoiceWave span:nth-child(2) {
+  height: 18px;
+  animation-delay: 0.1s;
+}
+
+.agentVoiceWave span:nth-child(3) {
+  height: 12px;
+  animation-delay: 0.2s;
+}
+
+.agentVoiceWave span:nth-child(4) {
+  height: 20px;
+  animation-delay: 0.3s;
+}
+
+.agentVoiceWave span:nth-child(5) {
+  height: 14px;
+  animation-delay: 0.4s;
+}
+
+.agentVoiceRecordingText {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.56);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.agentComposerError {
+  margin: 0;
+  padding: 0 8px;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.agentVoiceDraftCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 248, 237, 0.95);
+  border: 1px solid rgba(180, 83, 9, 0.18);
+}
+
+.agentConfirmCard {
+  margin: 0 14px 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+}
+
+.agentConfirmActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.agentChatMuteButton {
+  position: absolute;
+  right: 14px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.agentChatDetails {
+  margin: 0 14px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agentChatDetailsSummary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 0.82rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.agentChatDetailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.agentChatDetailsContent {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+@keyframes agent-voice-wave {
+  0%,
+  100% {
+    transform: scaleY(0.65);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scaleY(1.15);
+    opacity: 1;
+  }
 }
 
 .footer {
@@ -792,5 +1113,14 @@
   .nextButton {
     min-width: 0;
     flex: 1;
+  }
+
+  .agentChatHeader {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .chatMessageColumn {
+    width: min(100%, 82vw);
   }
 }

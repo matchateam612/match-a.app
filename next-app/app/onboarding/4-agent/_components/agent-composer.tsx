@@ -204,28 +204,12 @@ export function AgentComposer({
   });
 
   const alternateMode = currentInputMode === "text" ? "voice" : "text";
+  const isRecording = recordingState === "recording" || recordingState === "cancel-armed";
 
   return (
-    <div
-      className={styles.stackCard}
-      style={{
-        gap: 12,
-        border: "1px solid rgba(15, 23, 42, 0.08)",
-        background: "#ffffff",
-        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
-      }}
-    >
+    <div className={styles.agentComposerDock}>
       {pendingVoiceDraft ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            padding: 12,
-            borderRadius: 16,
-            background: "rgba(255, 248, 237, 0.95)",
-            border: "1px solid rgba(180, 83, 9, 0.18)",
-          }}
-        >
+        <div className={styles.agentVoiceDraftCard}>
           <strong style={{ fontSize: 14 }}>Voice note needs a retry</strong>
           <p className={styles.helper} style={{ margin: 0 }}>
             {pendingVoiceDraft.error}
@@ -242,38 +226,45 @@ export function AgentComposer({
         </div>
       ) : null}
 
-      {currentInputMode === "text" ? (
-        <>
-          <textarea
-            className={styles.input}
-            value={value}
-            rows={2}
-            disabled={disabled}
-            placeholder={disabled ? "The agent is thinking..." : "Message the onboarding agent..."}
-            onChange={(event) => setValue(event.target.value)}
-            style={{
-              minHeight: 82,
-              resize: "none",
-              borderRadius: 18,
-              background: "#f8fafc",
-              paddingTop: 16,
-              paddingBottom: 16,
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+      {isRecording ? (
+        <div className={styles.agentVoiceRecordingHint} aria-live="polite">
+          <div className={styles.agentVoiceWave} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <p className={styles.agentVoiceRecordingText}>
+            {recordingState === "cancel-armed" ? "Release to cancel" : "Listening... swipe up to cancel"}
+          </p>
+        </div>
+      ) : null}
+
+      <div className={styles.agentComposerBar}>
+        <button
+          type="button"
+          className={styles.agentComposerModeButton}
+          onClick={() => onSetInputMode(alternateMode)}
+          disabled={disabled || (currentInputMode === "text" ? !voiceModeEnabled : false)}
+          aria-label={currentInputMode === "text" ? "Switch to voice input" : "Switch to keyboard input"}
+        >
+          {currentInputMode === "text" ? <MicIcon /> : <KeyboardIcon />}
+        </button>
+
+        {currentInputMode === "text" ? (
+          <>
+            <textarea
+              className={styles.agentComposerInput}
+              value={value}
+              rows={1}
+              disabled={disabled}
+              placeholder={disabled ? "Thinking..." : "Message"}
+              onChange={(event) => setValue(event.target.value)}
+            />
             <button
               type="button"
-              className={styles.backButton}
-              onClick={() => onSetInputMode(alternateMode)}
-              disabled={disabled || !voiceModeEnabled}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              <MicIcon />
-              Voice
-            </button>
-            <button
-              type="button"
-              className={styles.nextButton}
+              className={styles.agentComposerSendButton}
               disabled={disabled || !value.trim()}
               onClick={() => {
                 void onSubmitText(value.trim());
@@ -282,92 +273,36 @@ export function AgentComposer({
             >
               Send
             </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              justifyItems: "center",
-              padding: "8px 0 2px",
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={disabled}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              void beginRecording(event.pointerId, event.clientY);
             }}
+            onPointerMove={(event) => {
+              updateRecordingPosition(event.clientY);
+            }}
+            onPointerUp={() => {
+              finishRecording();
+            }}
+            onPointerCancel={() => {
+              finishRecording();
+            }}
+            className={`${styles.agentHoldToTalkButton} ${
+              recordingState === "cancel-armed" ? styles.agentHoldToTalkCancel : ""
+            }`.trim()}
           >
-            <div
-              style={{
-                minHeight: 24,
-                color: recordingState === "cancel-armed" ? "#b91c1c" : "var(--color-text-secondary)",
-                fontSize: 14,
-                fontWeight: 700,
-              }}
-            >
-              {instructions}
-            </div>
-            <button
-              type="button"
-              disabled={disabled}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                void beginRecording(event.pointerId, event.clientY);
-              }}
-              onPointerMove={(event) => {
-                updateRecordingPosition(event.clientY);
-              }}
-              onPointerUp={() => {
-                finishRecording();
-              }}
-              onPointerCancel={() => {
-                finishRecording();
-              }}
-              className={styles.nextButton}
-              style={{
-                width: 82,
-                minWidth: 82,
-                minHeight: 82,
-                borderRadius: 999,
-                display: "grid",
-                placeItems: "center",
-                boxShadow:
-                  recordingState === "cancel-armed"
-                    ? "0 18px 36px rgba(185, 28, 28, 0.22)"
-                    : "0 18px 36px rgba(147, 73, 55, 0.2)",
-                background:
-                  recordingState === "cancel-armed"
-                    ? "linear-gradient(135deg, #dc2626, #ef4444)"
-                    : undefined,
-              }}
-            >
-              <span style={{ display: "grid", justifyItems: "center", gap: 8 }}>
-                <MicIcon />
-                <span>{recordingState === "recording" || recordingState === "cancel-armed" ? "Hold" : "Talk"}</span>
-              </span>
-            </button>
-            <div style={{ minHeight: 20 }}>
-              {recordingError ? (
-                <p className={styles.helper} style={{ margin: 0, color: "#b91c1c" }}>
-                  {recordingError}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <p className={styles.helper} style={{ margin: 0 }}>
-              Release to send.
-            </p>
-            <button
-              type="button"
-              className={styles.backButton}
-              onClick={() => onSetInputMode(alternateMode)}
-              disabled={disabled}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              <KeyboardIcon />
-              Keyboard
-            </button>
-          </div>
-        </>
-      )}
+            <span className={styles.agentHoldToTalkLabel}>{instructions}</span>
+          </button>
+        )}
+      </div>
+
+      {recordingError ? (
+        <p className={styles.agentComposerError}>{recordingError}</p>
+      ) : null}
     </div>
   );
 }

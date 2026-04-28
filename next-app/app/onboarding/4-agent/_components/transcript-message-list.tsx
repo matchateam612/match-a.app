@@ -14,17 +14,10 @@ export function TranscriptMessageList({
 }: TranscriptMessageListProps) {
   if (!transcript.length && !pendingAssistantMessage) {
     return (
-      <div
-        className={`${styles.stackCard} ${styles.agentSurfaceSoft}`.trim()}
-        style={{
-          minHeight: 240,
-          alignContent: "center",
-        }}
-      >
-        <div style={{ maxWidth: 420 }}>
-          <span className={styles.inlineLabel}>Conversation</span>
-          <p className={styles.helper}>
-            No conversation yet. Once a mode is selected, the agent’s first message will appear here in the chat view.
+      <div className={styles.agentTranscriptEmpty}>
+        <div className={styles.agentTranscriptEmptyBubble}>
+          <p className={styles.helper} style={{ margin: 0 }}>
+            Starting your conversation...
           </p>
         </div>
       </div>
@@ -32,14 +25,7 @@ export function TranscriptMessageList({
   }
 
   return (
-    <div
-      className={`${styles.stackCard} ${styles.agentSurfaceSoft}`.trim()}
-      style={{
-        minHeight: 260,
-        gap: 12,
-      }}
-    >
-      <span className={styles.inlineLabel}>Conversation</span>
+    <div className={styles.agentTranscriptScroller}>
       <div className={styles.chatMessageList}>
         {transcript.map((message) => (
           <article
@@ -49,13 +35,6 @@ export function TranscriptMessageList({
             }`.trim()}
           >
             <div className={styles.chatMessageColumn}>
-              <div
-                className={`${styles.chatMessageMeta} ${
-                  message.role === "assistant" ? styles.chatMessageMetaAssistant : styles.chatMessageMetaUser
-                }`.trim()}
-              >
-                <span>{message.role === "assistant" ? "Matcha" : "You"}</span>
-              </div>
               <div
                 className={`${styles.chatBubble} ${
                   message.role === "assistant" ? styles.chatBubbleAssistant : styles.chatBubbleUser
@@ -69,11 +48,6 @@ export function TranscriptMessageList({
         {pendingAssistantMessage ? (
           <article className={`${styles.chatMessage} ${styles.chatMessageAssistant}`.trim()}>
             <div className={styles.chatMessageColumn}>
-              <div
-                className={`${styles.chatMessageMeta} ${styles.chatMessageMetaAssistant}`.trim()}
-              >
-                <span>Matcha</span>
-              </div>
               <div className={`${styles.chatBubble} ${styles.chatBubbleAssistant}`.trim()}>
                 <p className={styles.chatBubbleText}>{pendingAssistantMessage}</p>
               </div>
