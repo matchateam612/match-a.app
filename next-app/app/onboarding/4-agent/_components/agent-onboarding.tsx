@@ -82,6 +82,7 @@ function AgentOnboardingClient() {
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [isConfirmationSheetVisible, setIsConfirmationSheetVisible] = useState(false);
   const [priorUserInfo, setPriorUserInfo] = useState<UserInfo>({});
   const promptSettings = readAgentPromptSettings();
   const criteriaDefinitions = readTestingCriteriaDefinitions();
@@ -153,6 +154,12 @@ function AgentOnboardingClient() {
       setSaveError("We couldn't save your agent draft on this device.");
     });
   }, [criteriaDefinitions, draft, isHydrating, progress, promptSettings]);
+
+  useEffect(() => {
+    if (draft.status === "confirming") {
+      setIsConfirmationSheetVisible(true);
+    }
+  }, [draft.status, draft.transcript.length]);
 
   const draftStatus = useMemo(() => {
     if (isHydrating) {
@@ -563,6 +570,7 @@ function AgentOnboardingClient() {
           transcript={draft.transcript}
           pendingAssistantMessage={pendingAssistantMessage}
           finalSummary={draft.finalSummary}
+          isConfirmationSheetVisible={isConfirmationSheetVisible}
           isSubmittingTurn={isSubmittingTurn || isPreparingConversation || turnLimitReached}
           isSpeechMuted={isSpeechMuted}
           pendingVoiceDraft={pendingVoiceDraft ? { url: pendingVoiceDraft.url, error: pendingVoiceDraft.error } : null}
@@ -583,6 +591,16 @@ function AgentOnboardingClient() {
             }));
             setProgress("complete");
             setSaveMessage("Conversation confirmed.");
+            void saveAgentProfile();
+          }}
+          onKeepChatting={() => {
+            setIsConfirmationSheetVisible(false);
+            setDraft((current) => ({
+              ...current,
+              status: "collecting",
+            }));
+            setProgress("collecting");
+            setSaveMessage("Continue chatting whenever you're ready.");
           }}
         />
 

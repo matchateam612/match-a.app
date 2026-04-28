@@ -22,6 +22,7 @@ type ChatPanelProps = {
   pendingAssistantMessage?: string;
   isSubmittingTurn?: boolean;
   finalSummary: string | null;
+  isConfirmationSheetVisible: boolean;
   isSpeechMuted: boolean;
   pendingVoiceDraft: PendingVoiceDraft | null;
   onSetInputMode: (mode: AgentConversationMode) => void;
@@ -30,6 +31,7 @@ type ChatPanelProps = {
   onRetryVoiceDraft: () => void;
   onDiscardVoiceDraft: () => void;
   onConfirmConversation: () => void;
+  onKeepChatting: () => void;
   onToggleSpeechMute: () => void;
 };
 
@@ -57,6 +59,7 @@ export function ChatPanel({
   pendingAssistantMessage = "",
   isSubmittingTurn = false,
   finalSummary,
+  isConfirmationSheetVisible,
   isSpeechMuted,
   pendingVoiceDraft,
   onSetInputMode,
@@ -65,22 +68,26 @@ export function ChatPanel({
   onRetryVoiceDraft,
   onDiscardVoiceDraft,
   onConfirmConversation,
+  onKeepChatting,
   onToggleSpeechMute,
 }: ChatPanelProps) {
-  const showComposer = status !== "confirming" && status !== "complete";
+  const showComposer = status !== "complete";
 
   return (
     <div className={styles.agentChatPanel}>
       <TranscriptMessageList transcript={transcript} pendingAssistantMessage={pendingAssistantMessage} />
 
-      {status === "confirming" ? (
+      {status === "confirming" && isConfirmationSheetVisible ? (
         <div className={styles.agentConfirmCard}>
           <span className={styles.inlineLabel}>Ready to finish</span>
-          <p style={{ marginTop: 0, marginBottom: 8 }}>The chat is ready to wrap with the current summary.</p>
+          <p style={{ marginTop: 0, marginBottom: 8 }}>Does this feel right, or do you want to keep chatting a little longer?</p>
           {finalSummary ? <p style={{ marginTop: 0, marginBottom: 8 }}>{finalSummary}</p> : null}
           <div className={styles.agentConfirmActions}>
+            <button type="button" className={styles.backButton} onClick={onKeepChatting}>
+              Keep chatting
+            </button>
             <button type="button" className={styles.nextButton} onClick={onConfirmConversation}>
-              Confirm and finish
+              Confirm
             </button>
           </div>
         </div>

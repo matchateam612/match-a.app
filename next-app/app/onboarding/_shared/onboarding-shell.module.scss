@@ -565,7 +565,14 @@
 .agentChatPage {
   min-height: 100dvh;
   background:
-    linear-gradient(180deg, #edf5ea 0%, #f4f8f2 18%, #f6f7f5 48%, #f7f7f6 100%);
+    radial-gradient(circle at 84% 10%, rgba(125, 244, 254, 0.18), transparent 20%),
+    radial-gradient(circle at 12% 12%, rgba(255, 161, 138, 0.28), transparent 26%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-secondary) 72%, transparent),
+      transparent 28%
+    ),
+    var(--color-page-background);
   color: var(--color-text-primary);
 }
 
@@ -579,7 +586,7 @@
   gap: 12px;
   min-height: 58px;
   padding: 10px 14px;
-  background: color-mix(in srgb, #f6f8f4 82%, transparent);
+  background: color-mix(in srgb, var(--color-surface-primary) 82%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -589,7 +596,7 @@
 }
 
 .agentChatSectionLabel {
-  color: rgba(15, 23, 42, 0.4);
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -600,7 +607,7 @@
   border: 0;
   padding: 0 6px;
   background: transparent;
-  color: rgba(15, 23, 42, 0.72);
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 0.92rem;
   font-weight: 700;
@@ -621,8 +628,8 @@
 }
 
 .agentChatStatusSoft {
-  background: rgba(255, 255, 255, 0.66);
-  color: rgba(15, 23, 42, 0.6);
+  background: color-mix(in srgb, var(--color-brand-tertiary-soft) 32%, var(--color-surface-secondary));
+  color: color-mix(in srgb, var(--color-brand-tertiary) 88%, var(--color-text-primary));
 }
 
 .agentChatInlineActions {
@@ -636,8 +643,8 @@
   min-height: 34px;
   padding: 0 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.76);
-  color: rgba(15, 23, 42, 0.74);
+  background: color-mix(in srgb, var(--color-surface-primary) 88%, transparent);
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 0.84rem;
   font-weight: 700;
@@ -671,7 +678,7 @@
   max-width: 240px;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.84);
+  background: color-mix(in srgb, var(--color-surface-primary) 92%, transparent);
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
 }
 
@@ -704,17 +711,17 @@
 
 .chatBubbleAssistant {
   border-radius: 18px 18px 18px 6px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--color-surface-primary) 94%, transparent);
   color: var(--color-text-primary);
   border: 1px solid rgba(15, 23, 42, 0.04);
 }
 
 .chatBubbleUser {
   border-radius: 18px 18px 6px 18px;
-  background: #95ec69;
-  color: #163300;
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-soft));
+  color: #ffffff;
   border: 1px solid transparent;
-  box-shadow: 0 6px 18px rgba(66, 130, 41, 0.12);
+  box-shadow: 0 10px 24px rgba(147, 73, 55, 0.18);
 }
 
 .chatBubbleText {
@@ -732,7 +739,14 @@
   gap: 10px;
   padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background:
-    linear-gradient(180deg, rgba(246, 247, 245, 0) 0%, rgba(246, 247, 245, 0.92) 24%, #f6f7f5 100%);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-page-background) 0%, transparent) 0%,
+      color-mix(in srgb, var(--color-page-background) 84%, transparent) 24%,
+      color-mix(in srgb, var(--color-page-background) 96%, transparent) 100%
+    );
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .agentComposerBar {
@@ -742,7 +756,7 @@
   gap: 10px;
   padding: 8px 10px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.94);
+  background: color-mix(in srgb, var(--color-surface-primary) 94%, transparent);
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
 }
 
@@ -750,7 +764,7 @@
 .agentComposerSendButton {
   border: 0;
   background: transparent;
-  color: rgba(15, 23, 42, 0.76);
+  color: var(--color-text-primary);
   font: inherit;
 }
 
@@ -781,7 +795,7 @@
 }
 
 .agentComposerInput::placeholder {
-  color: rgba(15, 23, 42, 0.38);
+  color: color-mix(in srgb, var(--color-text-secondary) 48%, transparent);
 }
 
 .agentComposerSendButton {
@@ -795,13 +809,14 @@
   min-height: 42px;
   border: 0;
   border-radius: 999px;
-  background: #f1f2f3;
-  color: rgba(15, 23, 42, 0.78);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   font: inherit;
   font-size: 0.95rem;
   font-weight: 700;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   touch-action: none;
 }
 
@@ -812,6 +827,45 @@
 
 .agentHoldToTalkLabel {
   pointer-events: none;
+}
+
+.agentHoldToTalkWave {
+  display: inline-flex;
+  align-items: end;
+  gap: 4px;
+  min-height: 20px;
+  pointer-events: none;
+}
+
+.agentHoldToTalkWave span {
+  width: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: agent-voice-wave 1s ease-in-out infinite;
+}
+
+.agentHoldToTalkWave span:nth-child(1) {
+  height: 8px;
+}
+
+.agentHoldToTalkWave span:nth-child(2) {
+  height: 16px;
+  animation-delay: 0.1s;
+}
+
+.agentHoldToTalkWave span:nth-child(3) {
+  height: 11px;
+  animation-delay: 0.2s;
+}
+
+.agentHoldToTalkWave span:nth-child(4) {
+  height: 18px;
+  animation-delay: 0.3s;
+}
+
+.agentHoldToTalkWave span:nth-child(5) {
+  height: 12px;
+  animation-delay: 0.4s;
 }
 
 .agentVoiceRecordingHint {
@@ -860,9 +914,11 @@
 
 .agentVoiceRecordingText {
   margin: 0;
-  color: rgba(15, 23, 42, 0.56);
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   font-weight: 700;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .agentComposerError {
@@ -886,13 +942,15 @@
   margin: 0 14px 12px;
   padding: 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
+  background: color-mix(in srgb, var(--color-surface-primary) 94%, transparent);
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
 .agentConfirmActions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .agentChatMuteButton {
@@ -905,21 +963,21 @@
   height: 38px;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: rgba(15, 23, 42, 0.72);
+  background: color-mix(in srgb, var(--color-surface-primary) 92%, transparent);
+  color: var(--color-text-primary);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
 .agentChatDetails {
   margin: 0 14px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--color-surface-primary) 72%, transparent);
 }
 
 .agentChatDetailsSummary {
   cursor: pointer;
   padding: 12px 14px;
-  color: rgba(15, 23, 42, 0.58);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
   list-style: none;

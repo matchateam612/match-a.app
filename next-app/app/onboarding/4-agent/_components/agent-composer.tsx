@@ -295,7 +295,17 @@ export function AgentComposer({
               recordingState === "cancel-armed" ? styles.agentHoldToTalkCancel : ""
             }`.trim()}
           >
-            <span className={styles.agentHoldToTalkLabel}>{instructions}</span>
+            {isRecording ? (
+              <span className={styles.agentHoldToTalkWave} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </span>
+            ) : (
+              <span className={styles.agentHoldToTalkLabel}>{instructions}</span>
+            )}
           </button>
         )}
       </div>
