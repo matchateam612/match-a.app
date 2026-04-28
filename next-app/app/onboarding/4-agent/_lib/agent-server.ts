@@ -21,6 +21,8 @@ import type {
   AgentCriterionStatus,
 } from "./agent-types";
 
+const UI_CONFIRM_TOKEN = "[UI_CONFIRM]";
+
 type ExtractorUpdate = {
   id: string;
   summary: string | null;
@@ -163,6 +165,8 @@ Rules:
 - Do not mention internal scores or JSON.
 - If every criterion is strongly confirmed, stop asking new questions and give a concise confirmation summary of what you heard.
 - The confirmation message should clearly invite the user to review and confirm before the app ends the process.
+- If and only if the message you are producing is a confirmation-style message that should trigger the app's confirm UI, prepend exactly ${UI_CONFIRM_TOKEN} at the very start of the response with no spaces before it.
+- Do not use ${UI_CONFIRM_TOKEN} for normal follow-up questions.
 - Keep the response concise.`;
 }
 
@@ -400,7 +404,7 @@ async function runInterviewer({
     const nextCriterion = getNextCriterionToExplore(updatedCriteria);
 
     if (!nextCriterion) {
-      return `Here’s what I’m hearing so far: ${draftSummary}. Did I get that right?`;
+      return `${UI_CONFIRM_TOKEN}Here’s what I’m hearing so far: ${draftSummary}. Did I get that right?`;
     }
 
     return `Thanks, that helps. I’d like to understand ${nextCriterion.label.toLowerCase()} next. What matters most to you there?`;
@@ -496,7 +500,7 @@ async function runInitialInterviewer(request: CreateInitialAgentTurnRequest) {
 
   if (!env.apiKey) {
     if (!nextCriterion) {
-      return "I have a strong starting picture of what you're looking for. I'll reflect it back so we can confirm the details together.";
+      return `${UI_CONFIRM_TOKEN}I have a strong starting picture of what you're looking for. I'll reflect it back so we can confirm the details together.`;
     }
 
     return `I’ve got some context from your earlier onboarding answers. To get this conversation started, tell me a little about ${nextCriterion.label.toLowerCase()}.`;

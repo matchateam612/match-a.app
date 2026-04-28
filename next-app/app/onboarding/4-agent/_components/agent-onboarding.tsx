@@ -40,8 +40,23 @@ type PendingVoiceDraft = {
   error: string;
 };
 
+const UI_CONFIRM_TOKEN = "[UI_CONFIRM]";
+
+function parseAssistantUiMessage(text: string) {
+  const trimmed = text.trimStart();
+  const hasConfirmToken = trimmed.startsWith(UI_CONFIRM_TOKEN);
+  const visibleText = hasConfirmToken
+    ? trimmed.slice(UI_CONFIRM_TOKEN.length).trimStart()
+    : text;
+
+  return {
+    hasConfirmToken,
+    visibleText,
+  };
+}
+
 function isAssistantConfirmationPrompt(text: string) {
-  const normalized = text.trim().toLowerCase();
+  const normalized = parseAssistantUiMessage(text).visibleText.trim().toLowerCase();
 
   if (!normalized) {
     return false;
@@ -56,6 +71,17 @@ function isAssistantConfirmationPrompt(text: string) {
       normalized.includes("did i get that right") ||
       normalized.includes("does that feel") ||
       normalized.includes("does that land"))
+  );
+}
+
+function shouldShowConfirmationSheet(args: {
+  assistantMessage: string;
+  status: AgentOnboardingState["status"];
+}) {
+  return (
+    parseAssistantUiMessage(args.assistantMessage).hasConfirmToken ||
+    args.status === "confirming" ||
+    isAssistantConfirmationPrompt(args.assistantMessage)
   );
 }
 
@@ -223,28 +249,33 @@ function AgentOnboardingClient() {
         );
       }
 
+      const parsedAssistantMessage = parseAssistantUiMessage(payload.assistantMessage);
       const initialTranscriptItem = createTranscriptItem({
         role: "assistant",
         modality: draft.selectedMode,
-        text: payload.assistantMessage,
+        text: parsedAssistantMessage.visibleText,
       });
       const nextStatus = getCappedStatus(draft.turnCount, payload.status);
+      const shouldOpenConfirmationSheet = shouldShowConfirmationSheet({
+        assistantMessage: payload.assistantMessage,
+        status: nextStatus,
+      });
 
       setDraft((current) => ({
         ...current,
         criteria: payload.criteria,
         transcript: [initialTranscriptItem],
-        status: isAssistantConfirmationPrompt(payload.assistantMessage) ? "confirming" : nextStatus,
+        status: shouldOpenConfirmationSheet ? "confirming" : nextStatus,
         finalSummary: payload.draftSummary,
         lastAskedCriterionId: payload.lastAskedCriterionId,
       }));
-      setProgress(isAssistantConfirmationPrompt(payload.assistantMessage) ? "confirming" : nextStatus);
-      setIsConfirmationSheetVisible(isAssistantConfirmationPrompt(payload.assistantMessage));
+      setProgress(shouldOpenConfirmationSheet ? "confirming" : nextStatus);
+      setIsConfirmationSheetVisible(shouldOpenConfirmationSheet);
       setSaveMessage("Your onboarding conversation is ready.");
 
       if (draft.selectedMode === "voice") {
         cancelSpeech();
-        queueSpeechFromText(payload.assistantMessage, true);
+        queueSpeechFromText(parsedAssistantMessage.visibleText, true);
       }
     } catch (error) {
       setSaveMessage("");
@@ -335,14 +366,20 @@ function AgentOnboardingClient() {
           },
         });
 
-        const assistantText = completedPayload.assistantMessage || streamedAssistantMessage;
-        const shouldShowConfirmationSheet = isAssistantConfirmationPrompt(assistantText);
-        const resolvedStatus = shouldShowConfirmationSheet
+        const rawAssistantText = completedPayload.assistantMessage || streamedAssistantMessage;
+        const parsedAssistantMessage = parseAssistantUiMessage(rawAssistantText);
+        const assistantText = parsedAssistantMessage.visibleText;
+        const resolvedStatus = getCappedStatus(nextTurnCount, completedPayload.status);
+        const shouldOpenConfirmationSheet = shouldShowConfirmationSheet({
+          assistantMessage: rawAssistantText,
+          status: resolvedStatus,
+        });
+        const nextStatus = shouldOpenConfirmationSheet
           ? "confirming"
-          : getCappedStatus(nextTurnCount, completedPayload.status);
+          : resolvedStatus;
         queueSpeechFromText(assistantText, true);
         setPendingAssistantMessage("");
-        setIsConfirmationSheetVisible(shouldShowConfirmationSheet);
+        setIsConfirmationSheetVisible(shouldOpenConfirmationSheet);
 
         setDraft((current) => ({
           ...current,
@@ -355,12 +392,12 @@ function AgentOnboardingClient() {
               text: assistantText,
             }),
           ],
-          status: resolvedStatus,
+          status: nextStatus,
           finalSummary: completedPayload.draftSummary,
           lastAskedCriterionId: completedPayload.lastAskedCriterionId,
         }));
 
-        setProgress(resolvedStatus);
+        setProgress(nextStatus);
         setSaveMessage(
           nextTurnCount >= MAX_AGENT_TURNS
             ? "Reached the 20-turn cap. The conversation is now ready for summary confirmation."

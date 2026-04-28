@@ -38,9 +38,11 @@ export function useAgentSpeechPlayback({
   muted: boolean;
 }) {
   const queuedSpeechLengthRef = useRef(0);
+  const lastQueuedTextRef = useRef("");
 
   const cancelSpeech = useCallback(() => {
     queuedSpeechLengthRef.current = 0;
+    lastQueuedTextRef.current = "";
 
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -57,6 +59,15 @@ export function useAgentSpeechPlayback({
       ) {
         return;
       }
+
+      if (
+        queuedSpeechLengthRef.current > text.length ||
+        (lastQueuedTextRef.current && !text.startsWith(lastQueuedTextRef.current))
+      ) {
+        queuedSpeechLengthRef.current = 0;
+      }
+
+      lastQueuedTextRef.current = text;
 
       while (queuedSpeechLengthRef.current < text.length) {
         const remaining = text.slice(queuedSpeechLengthRef.current);
@@ -77,6 +88,9 @@ export function useAgentSpeechPlayback({
         const utterance = new SpeechSynthesisUtterance(segment);
         utterance.rate = 1;
         utterance.pitch = 1;
+        utterance.onstart = () => {
+          window.speechSynthesis.resume();
+        };
         window.speechSynthesis.speak(utterance);
       }
     },
