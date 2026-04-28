@@ -6,6 +6,7 @@ import {
   getOnboardingFileRecord,
   setOnboardingFileRecord,
 } from "@/lib/onboarding-idb/file-store";
+import { PICTURE_AI_FILE_IDS } from "@/lib/onboarding-idb/types";
 
 type UsePictureDraftFilesOptions = {
   enabled: boolean;
@@ -76,11 +77,11 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
         ...generated.map((file, index) =>
           file
             ? setOnboardingFileRecord({
-                id: `pfp-ai-${index + 1}` as const,
+                id: PICTURE_AI_FILE_IDS[index],
                 file,
                 updatedAt: new Date().toISOString(),
               })
-            : clearOnboardingFileRecord(`pfp-ai-${index + 1}` as const),
+            : clearOnboardingFileRecord(PICTURE_AI_FILE_IDS[index]),
         ),
       ]);
     },
@@ -96,17 +97,15 @@ export function usePictureDraftFiles({ enabled }: UsePictureDraftFilesOptions) {
 
     void Promise.all([
       getOnboardingFileRecord("pfp-original"),
-      getOnboardingFileRecord("pfp-ai-1"),
-      getOnboardingFileRecord("pfp-ai-2"),
-      getOnboardingFileRecord("pfp-ai-3"),
+      ...PICTURE_AI_FILE_IDS.map((id) => getOnboardingFileRecord(id)),
     ])
-      .then(([originalRecord, generatedRecord1, generatedRecord2, generatedRecord3]) => {
+      .then(([originalRecord, ...generatedRecords]) => {
         if (isCancelled) {
           return;
         }
 
         setPreviewFile("original", originalRecord?.file ?? null);
-        [generatedRecord1, generatedRecord2, generatedRecord3].forEach((record, index) => {
+        generatedRecords.forEach((record, index) => {
           setPreviewFile("generated", record?.file ?? null, index);
         });
       })

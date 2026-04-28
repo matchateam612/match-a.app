@@ -16,12 +16,11 @@ export const ONBOARDING_FILES_STORE = "files";
 export const ONBOARDING_SYNC_STORE = "sync";
 export const ONBOARDING_DRAFT_ID = "draft";
 export const ONBOARDING_SYNC_ID = "sync";
+export const PICTURE_AI_FILE_IDS = ["pfp-ai-1", "pfp-ai-2", "pfp-ai-3"] as const;
 
 export type OnboardingFileRecordId =
   | "pfp-original"
-  | "pfp-ai-1"
-  | "pfp-ai-2"
-  | "pfp-ai-3"
+  | (typeof PICTURE_AI_FILE_IDS)[number]
   | `gallery-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`;
 
 export type OnboardingMetaRecord = {
@@ -66,9 +65,7 @@ export type OnboardingMetaRecord = {
     picture: {
       currentStep: number;
       completed: boolean;
-      metadata: PictureDraft & {
-        selectedVariant: "original" | "aiTransformed";
-      };
+      metadata: PictureDraft;
       galleryOrder: number[];
     };
     agent: {
