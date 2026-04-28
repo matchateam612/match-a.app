@@ -166,6 +166,8 @@ Rules:
 - If every criterion is strongly confirmed, stop asking new questions and give a concise confirmation summary of what you heard.
 - The confirmation message should clearly invite the user to review and confirm before the app ends the process.
 - If and only if the message you are producing is a confirmation-style message that should trigger the app's confirm UI, prepend exactly ${UI_CONFIRM_TOKEN} at the very start of the response with no spaces before it.
+- When you use ${UI_CONFIRM_TOKEN}, it must be the very first characters in the response and there must be no preamble, setup sentence, or meta-comment before it.
+- A ${UI_CONFIRM_TOKEN} response should be only the confirmation summary itself, followed by the confirming question.
 - Do not use ${UI_CONFIRM_TOKEN} for normal follow-up questions.
 - Keep the response concise.`;
 }

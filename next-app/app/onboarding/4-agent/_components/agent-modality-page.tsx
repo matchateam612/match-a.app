@@ -15,6 +15,18 @@ import type { AgentConversationMode } from "../_lib/agent-types";
 import { AgentLayout } from "./agent-layout";
 import { ModePicker } from "./mode-picker";
 
+function primeSpeechSynthesis() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance("");
+  utterance.volume = 0;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+  window.speechSynthesis.resume();
+}
+
 export function AgentModalityPage() {
   const isClientReady = useClientReady();
 
@@ -97,6 +109,10 @@ function AgentModalityPageClient() {
     setIsSelecting(true);
 
     try {
+      if (selectedMode === "voice") {
+        primeSpeechSynthesis();
+      }
+
       const storedState = await readStoredAgentStateFromIdb(criteriaDefinitions, promptSettings);
       const nextDraft = {
         ...storedState.draft,

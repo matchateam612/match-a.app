@@ -43,10 +43,9 @@ type PendingVoiceDraft = {
 const UI_CONFIRM_TOKEN = "[UI_CONFIRM]";
 
 function parseAssistantUiMessage(text: string) {
-  const trimmed = text.trimStart();
-  const hasConfirmToken = trimmed.startsWith(UI_CONFIRM_TOKEN);
+  const hasConfirmToken = text.includes(UI_CONFIRM_TOKEN);
   const visibleText = hasConfirmToken
-    ? trimmed.slice(UI_CONFIRM_TOKEN.length).trimStart()
+    ? text.replaceAll(UI_CONFIRM_TOKEN, "").replace(/\n{3,}/g, "\n\n").trim()
     : text;
 
   return {
