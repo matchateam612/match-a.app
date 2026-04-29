@@ -60,6 +60,10 @@ export async function POST(request: Request, { params }: MatchShareContactRouteP
       value,
     });
 
+    if (!currentAction) {
+      throw new Error("We couldn't save your shared contact right now.");
+    }
+
     const nextState = await getMatchUserActionsForBothUsers(matchId, user.id);
     const currentUserAction = nextState.currentUserAction;
     const otherUserAction = nextState.otherUserAction;
