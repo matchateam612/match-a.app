@@ -8,7 +8,13 @@ import {
   type DashboardMessage,
   type DashboardThread,
 } from "@/lib/dashboard/chat-api";
-import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-api";
+import {
+  listMatchThreadsRequest,
+  type MatchThread,
+  updateMatchDeclineRequest,
+  updateMatchSharedContactRequest,
+} from "@/lib/matches/match-api";
+import type { SharedContactType } from "@/lib/supabase/types";
 
 import styles from "../page.module.scss";
 import { DashboardMessageList } from "./dashboard-message-list";
@@ -19,6 +25,12 @@ import {
 import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 
 const PENDING_THREAD_STORAGE_KEY = "dashboard-chat:pending-route";
+const CONTACT_OPTIONS: Array<{ label: string; value: SharedContactType }> = [
+  { label: "Phone", value: "phone" },
+  { label: "WhatsApp", value: "whatsapp" },
+  { label: "Instagram", value: "instagram" },
+  { label: "WeChat", value: "wechat" },
+];
 
 function getStoredPendingMessages(matchId: string): PendingDashboardMessage[] {
   if (typeof window === "undefined") {
@@ -73,6 +85,13 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
   );
   const [match, setMatch] = useState<MatchThread | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [activeDecline, setActiveDecline] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [activeContact, setActiveContact] = useState(false);
+  const [contactType, setContactType] = useState<SharedContactType>("phone");
+  const [contactValue, setContactValue] = useState("");
+  const [isSavingAction, setIsSavingAction] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -282,6 +301,96 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
     match.mentalitySummary ??
     "I found this profile in your secure match list.";
 
+  async function handleSaveDecline() {
+    try {
+      setIsSavingAction(true);
+      setActionError(null);
+      const response = await updateMatchDeclineRequest(matchId, {
+        declined: true,
+        reason: declineReason,
+      });
+      setMatch((current) =>
+        current
+          ? {
+              ...current,
+              declined: response.declined,
+              declineReason: response.declineReason,
+              sharedContactType: response.sharedContactType,
+              sharedContactValue: response.sharedContactValue,
+              hasSharedContact: response.hasSharedContact,
+            }
+          : current,
+      );
+      setActiveDecline(false);
+      setDeclineReason(response.declineReason ?? "");
+      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh", { detail: { scope: "lists" } }));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "We couldn't save that decline yet.");
+    } finally {
+      setIsSavingAction(false);
+    }
+  }
+
+  async function handleUndoDecline() {
+    try {
+      setIsSavingAction(true);
+      setActionError(null);
+      const response = await updateMatchDeclineRequest(matchId, {
+        declined: false,
+      });
+      setMatch((current) =>
+        current
+          ? {
+              ...current,
+              declined: response.declined,
+              declineReason: response.declineReason,
+              sharedContactType: response.sharedContactType,
+              sharedContactValue: response.sharedContactValue,
+              hasSharedContact: response.hasSharedContact,
+            }
+          : current,
+      );
+      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh", { detail: { scope: "lists" } }));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "We couldn't update that decline yet.");
+    } finally {
+      setIsSavingAction(false);
+    }
+  }
+
+  async function handleSaveContact() {
+    try {
+      setIsSavingAction(true);
+      setActionError(null);
+      const response = await updateMatchSharedContactRequest(matchId, {
+        type: contactType,
+        value: contactValue,
+      });
+      setMatch((current) =>
+        current
+          ? {
+              ...current,
+              declined: response.declined,
+              declineReason: response.declineReason,
+              sharedContactType: response.sharedContactType,
+              sharedContactValue: response.sharedContactValue,
+              hasSharedContact: response.hasSharedContact,
+            }
+          : current,
+      );
+      setActiveContact(false);
+      window.dispatchEvent(
+        new CustomEvent("dashboard-chat:refresh", {
+          detail: { routeKind: "match", routeId: matchId },
+        }),
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "We couldn't save your shared contact yet.");
+    } finally {
+      setIsSavingAction(false);
+    }
+  }
+
   return (
     <div className={styles.chatCanvas}>
       <article className={styles.matchFeatureCard}>
@@ -316,6 +425,117 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
               ))}
             </div>
           ) : null}
+          <div className={styles.rippleActionRow}>
+            <button
+              className={styles.rippleActionSecondary}
+              disabled={isSavingAction}
+              onClick={() => {
+                setActionError(null);
+                setActiveContact(false);
+                if (match.declined) {
+                  void handleUndoDecline();
+                  return;
+                }
+
+                setActiveDecline((current) => !current);
+                setDeclineReason(match.declineReason ?? "");
+              }}
+              type="button"
+            >
+              {isSavingAction && !activeDecline ? "Saving..." : match.declined ? "Undo Decline" : "Decline"}
+            </button>
+            <button
+              className={styles.rippleActionPrimary}
+              disabled={isSavingAction}
+              onClick={() => {
+                setActionError(null);
+                setActiveDecline(false);
+                setActiveContact((current) => !current);
+                setContactType(match.sharedContactType ?? "phone");
+                setContactValue(match.sharedContactValue ?? "");
+              }}
+              type="button"
+            >
+              {match.hasSharedContact ? "Edit Shared Contact" : "Share my contact"}
+            </button>
+          </div>
+          {activeDecline ? (
+            <div className={styles.rippleInlinePanel}>
+              <label className={styles.rippleFieldLabel} htmlFor="match-decline-reason">
+                Why do you think this user is not a right fit?
+              </label>
+              <textarea
+                className={styles.rippleTextarea}
+                id="match-decline-reason"
+                onChange={(event) => setDeclineReason(event.target.value)}
+                rows={3}
+                value={declineReason}
+              />
+              <div className={styles.rippleInlineActions}>
+                <button
+                  className={styles.rippleInlineButton}
+                  disabled={isSavingAction || !declineReason.trim()}
+                  onClick={() => void handleSaveDecline()}
+                  type="button"
+                >
+                  {isSavingAction ? "Saving..." : "Save decline"}
+                </button>
+                <button
+                  className={styles.rippleInlineGhost}
+                  disabled={isSavingAction}
+                  onClick={() => setActiveDecline(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {activeContact ? (
+            <div className={styles.rippleInlinePanel}>
+              <label className={styles.rippleFieldLabel} htmlFor="match-contact-type">
+                Choose one way to share your contact
+              </label>
+              <select
+                className={styles.rippleSelect}
+                id="match-contact-type"
+                onChange={(event) => setContactType(event.target.value as SharedContactType)}
+                value={contactType}
+              >
+                {CONTACT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={styles.rippleInput}
+                onChange={(event) => setContactValue(event.target.value)}
+                placeholder="Enter your contact info"
+                type="text"
+                value={contactValue}
+              />
+              <div className={styles.rippleInlineActions}>
+                <button
+                  className={styles.rippleInlineButton}
+                  disabled={isSavingAction || !contactValue.trim()}
+                  onClick={() => void handleSaveContact()}
+                  type="button"
+                >
+                  {isSavingAction ? "Saving..." : "Save contact"}
+                </button>
+                <button
+                  className={styles.rippleInlineGhost}
+                  disabled={isSavingAction}
+                  onClick={() => setActiveContact(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {actionError ? <p className={styles.rippleError}>{actionError}</p> : null}
         </div>
       </article>
 
