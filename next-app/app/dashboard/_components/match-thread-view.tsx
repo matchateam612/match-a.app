@@ -18,6 +18,48 @@ import {
 } from "./dashboard-pending-message-list";
 import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 
+const PENDING_THREAD_STORAGE_KEY = "dashboard-chat:pending-route";
+
+function getStoredPendingMessages(matchId: string): PendingDashboardMessage[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const storedPending = window.sessionStorage.getItem(PENDING_THREAD_STORAGE_KEY);
+
+  if (!storedPending) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(storedPending) as {
+      routeKind: "thread" | "match";
+      routeId: string;
+      userMessage: DashboardMessage;
+    };
+
+    if (parsed.routeKind !== "match" || parsed.routeId !== matchId) {
+      return [];
+    }
+
+    return [
+      {
+        id: parsed.userMessage.id,
+        role: "user",
+        content: parsed.userMessage.content,
+      },
+      {
+        id: `pending-assistant-${matchId}`,
+        role: "assistant",
+        content: "Glint is looking through this match...",
+      },
+    ];
+  } catch {
+    window.sessionStorage.removeItem(PENDING_THREAD_STORAGE_KEY);
+    return [];
+  }
+}
+
 type MatchThreadViewProps = {
   matchId: string;
 };
@@ -25,7 +67,9 @@ type MatchThreadViewProps = {
 export function MatchThreadView({ matchId }: MatchThreadViewProps) {
   const [thread, setThread] = useState<DashboardThread | null>(null);
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
-  const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>(() =>
+    getStoredPendingMessages(matchId),
+  );
   const [match, setMatch] = useState<MatchThread | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
@@ -33,8 +77,6 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
     let isMounted = true;
 
     async function loadMatchThread() {
-      setState("loading");
-
       try {
         const [threadResponse, matchResponse] = await Promise.all([
           getDashboardMatchThreadRequest(matchId),
@@ -61,10 +103,13 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
     }
 
     function handleRefresh(event: Event) {
-      const detail = (event as CustomEvent<{ routeKind?: string; routeId?: string }>).detail;
+      const detail = (event as CustomEvent<{ routeKind?: string; routeId?: string; scope?: string }>).detail;
+
+      if (detail?.scope === "lists") {
+        return;
+      }
 
       if (!detail || (detail.routeKind === "match" && detail.routeId === matchId) || !detail.routeKind) {
-        setPendingMessages([]);
         void loadMatchThread();
       }
     }
@@ -120,11 +165,47 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       setPendingMessages([]);
     }
 
+    function handleAssistantDone(
+      event: Event,
+    ) {
+      const detail = (
+        event as CustomEvent<{
+          threadId: string;
+          routeKind: "thread" | "match";
+          routeId: string;
+          assistantMessage: DashboardMessage;
+        }>
+      ).detail;
+
+      if (!detail || detail.routeKind !== "match" || detail.routeId !== matchId) {
+        return;
+      }
+
+      setPendingMessages([]);
+      setMessages((current) => {
+        if (current.some((message) => message.id === detail.assistantMessage.id)) {
+          return current;
+        }
+
+        return [...current, detail.assistantMessage];
+      });
+      setThread((current) =>
+        current
+          ? {
+              ...current,
+              latest_message_preview: detail.assistantMessage.content,
+              last_message_at: detail.assistantMessage.created_at,
+            }
+          : current,
+      );
+    }
+
     void loadMatchThread();
     window.addEventListener("dashboard-chat:refresh", handleRefresh);
     window.addEventListener("dashboard-chat:pending-start", handlePendingStart);
     window.addEventListener("dashboard-chat:pending-delta", handlePendingDelta);
     window.addEventListener("dashboard-chat:pending-end", handlePendingEnd);
+    window.addEventListener("dashboard-chat:assistant-done", handleAssistantDone);
 
     return () => {
       isMounted = false;
@@ -132,10 +213,11 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       window.removeEventListener("dashboard-chat:pending-start", handlePendingStart);
       window.removeEventListener("dashboard-chat:pending-delta", handlePendingDelta);
       window.removeEventListener("dashboard-chat:pending-end", handlePendingEnd);
+      window.removeEventListener("dashboard-chat:assistant-done", handleAssistantDone);
     };
   }, [matchId]);
 
-  if (state === "loading") {
+  if (state === "loading" && pendingMessages.length === 0) {
     return (
       <div className={styles.chatCanvas}>
         <section className={styles.messageCluster}>
@@ -174,52 +256,53 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
 
   return (
     <div className={styles.chatCanvas}>
-      <section className={styles.messageCluster}>
-        <div className={styles.assistantAvatar}>✦</div>
-        <div className={styles.messageStack}>
-          {messages.length === 0 ? (
-            <div className={styles.assistantBubble}>
-              I found someone worth looking at. {summary} Ask me what stands out, what you may have
-              in common, or how you might start the conversation.
-            </div>
-          ) : null}
-
-          <article className={styles.matchFeatureCard}>
-            <div className={styles.matchPhoto}>
-              {match.profilePictureUrl ? (
-                <Image
-                  src={match.profilePictureUrl}
-                  alt={`${match.label} profile picture`}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 720px) 90vw, 620px"
-                  style={{ objectFit: "cover" }}
-                />
-              ) : (
-                <span>{match.label.slice(0, 1)}</span>
-              )}
-            </div>
-            <div className={styles.matchCardBody}>
-              <div>
-                <h3 className={styles.matchName}>
-                  {match.label}
-                  {match.age ? `, ${match.age}` : ""}
-                </h3>
-                <p className={styles.matchLocation}>{match.statusLabel ?? "Potential match"}</p>
-              </div>
-              {tags.length > 0 ? (
-                <div className={styles.matchTags}>
-                  {tags.map((tag) => (
-                    <span className={styles.matchTag} key={tag}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </article>
+      <section className={styles.threadHeader}>
+        <div>
+          <p className={styles.eyebrow}>Match Chat</p>
+          <h1 className={styles.threadTitleLarge}>
+            {match.label}
+            {match.age ? `, ${match.age}` : ""}
+          </h1>
+          <p className={styles.heroCopy}>
+            {summary}
+          </p>
         </div>
       </section>
+
+      <article className={styles.matchFeatureCard}>
+        <div className={styles.matchPhoto}>
+          {match.profilePictureUrl ? (
+            <Image
+              src={match.profilePictureUrl}
+              alt={`${match.label} profile picture`}
+              fill
+              unoptimized
+              sizes="(max-width: 720px) 90vw, 620px"
+              style={{ objectFit: "cover" }}
+            />
+          ) : (
+            <span>{match.label.slice(0, 1)}</span>
+          )}
+        </div>
+        <div className={styles.matchCardBody}>
+          <div>
+            <h3 className={styles.matchName}>
+              {match.label}
+              {match.age ? `, ${match.age}` : ""}
+            </h3>
+            <p className={styles.matchLocation}>{match.statusLabel ?? "Potential match"}</p>
+          </div>
+          {tags.length > 0 ? (
+            <div className={styles.matchTags}>
+              {tags.map((tag) => (
+                <span className={styles.matchTag} key={tag}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </article>
 
       {messages.length === 0 ? (
         <DashboardSuggestionChips
@@ -231,7 +314,9 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
         />
       ) : null}
 
-      <DashboardMessageList messages={messages} />
+      <div className={styles.transcriptStack}>
+        <DashboardMessageList messages={messages} />
+      </div>
       <DashboardPendingMessageList messages={pendingMessages} />
     </div>
   );

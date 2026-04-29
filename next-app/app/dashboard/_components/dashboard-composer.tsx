@@ -6,9 +6,33 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   submitDashboardChatTurnRequest,
   submitDashboardChatTurnStreamRequest,
+  type DashboardMessage,
 } from "@/lib/dashboard/chat-api";
 
 import styles from "../page.module.scss";
+
+const PENDING_THREAD_STORAGE_KEY = "dashboard-chat:pending-route";
+
+function persistPendingRoute(payload: {
+  routeKind: "thread" | "match";
+  routeId: string;
+  threadId: string;
+  userMessage: DashboardMessage;
+}) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(PENDING_THREAD_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function clearPendingRoute() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(PENDING_THREAD_STORAGE_KEY);
+}
 
 export function DashboardComposer() {
   const [message, setMessage] = useState("");
@@ -82,6 +106,7 @@ export function DashboardComposer() {
         onMeta: (meta) => {
           streamStarted = true;
           setMessage("");
+          persistPendingRoute(meta);
           window.dispatchEvent(
             new CustomEvent("dashboard-chat:pending-start", {
               detail: {
@@ -109,12 +134,16 @@ export function DashboardComposer() {
           );
         },
         onAssistantDone: (donePayload) => {
+          clearPendingRoute();
+          window.dispatchEvent(
+            new CustomEvent("dashboard-chat:assistant-done", {
+              detail: donePayload,
+            }),
+          );
           window.dispatchEvent(
             new CustomEvent("dashboard-chat:refresh", {
               detail: {
-                threadId: donePayload.threadId,
-                routeKind: donePayload.routeKind,
-                routeId: donePayload.routeId,
+                scope: "lists",
               },
             }),
           );
@@ -130,12 +159,16 @@ export function DashboardComposer() {
         const result = await submitDashboardChatTurnRequest(payload);
 
         setMessage("");
+        clearPendingRoute();
+        window.dispatchEvent(
+          new CustomEvent("dashboard-chat:assistant-done", {
+            detail: result,
+          }),
+        );
         window.dispatchEvent(
           new CustomEvent("dashboard-chat:refresh", {
             detail: {
-              threadId: result.threadId,
-              routeKind: result.routeKind,
-              routeId: result.routeId,
+              scope: "lists",
             },
           }),
         );
@@ -147,6 +180,7 @@ export function DashboardComposer() {
           router.push(`/dashboard/matches/${result.routeId}`);
         }
       } catch (fallbackError) {
+        clearPendingRoute();
         window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
         setReply(
           fallbackError instanceof Error

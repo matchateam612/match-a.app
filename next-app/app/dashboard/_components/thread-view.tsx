@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
-  archiveDashboardThreadRequest,
   getDashboardThreadRequest,
-  renameDashboardThreadRequest,
   type DashboardMessage,
   type DashboardThread,
 } from "@/lib/dashboard/chat-api";
@@ -19,26 +16,64 @@ import {
 } from "./dashboard-pending-message-list";
 import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 
+const PENDING_THREAD_STORAGE_KEY = "dashboard-chat:pending-route";
+
+function getStoredPendingMessages(threadId: string): PendingDashboardMessage[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const storedPending = window.sessionStorage.getItem(PENDING_THREAD_STORAGE_KEY);
+
+  if (!storedPending) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(storedPending) as {
+      routeKind: "thread" | "match";
+      routeId: string;
+      userMessage: DashboardMessage;
+    };
+
+    if (parsed.routeKind !== "thread" || parsed.routeId !== threadId) {
+      return [];
+    }
+
+    return [
+      {
+        id: parsed.userMessage.id,
+        role: "user",
+        content: parsed.userMessage.content,
+      },
+      {
+        id: `pending-assistant-${threadId}`,
+        role: "assistant",
+        content: "Glint is thinking...",
+      },
+    ];
+  } catch {
+    window.sessionStorage.removeItem(PENDING_THREAD_STORAGE_KEY);
+    return [];
+  }
+}
+
 type ThreadViewProps = {
   threadId: string;
 };
 
 export function ThreadView({ threadId }: ThreadViewProps) {
-  const router = useRouter();
   const [thread, setThread] = useState<DashboardThread | null>(null);
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
-  const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>(() =>
+    getStoredPendingMessages(threadId),
+  );
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [isArchiving, setIsArchiving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadThread() {
-      setState("loading");
-
       try {
         const response = await getDashboardThreadRequest(threadId);
 
@@ -57,10 +92,13 @@ export function ThreadView({ threadId }: ThreadViewProps) {
     }
 
     function handleRefresh(event: Event) {
-      const detail = (event as CustomEvent<{ threadId?: string }>).detail;
+      const detail = (event as CustomEvent<{ threadId?: string; scope?: string }>).detail;
+
+      if (detail?.scope === "lists") {
+        return;
+      }
 
       if (!detail?.threadId || detail.threadId === threadId) {
-        setPendingMessages([]);
         void loadThread();
       }
     }
@@ -116,11 +154,47 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       setPendingMessages([]);
     }
 
+    function handleAssistantDone(
+      event: Event,
+    ) {
+      const detail = (
+        event as CustomEvent<{
+          threadId: string;
+          routeKind: "thread" | "match";
+          routeId: string;
+          assistantMessage: DashboardMessage;
+        }>
+      ).detail;
+
+      if (!detail || detail.routeKind !== "thread" || detail.threadId !== threadId) {
+        return;
+      }
+
+      setPendingMessages([]);
+      setMessages((current) => {
+        if (current.some((message) => message.id === detail.assistantMessage.id)) {
+          return current;
+        }
+
+        return [...current, detail.assistantMessage];
+      });
+      setThread((current) =>
+        current
+          ? {
+              ...current,
+              latest_message_preview: detail.assistantMessage.content,
+              last_message_at: detail.assistantMessage.created_at,
+            }
+          : current,
+      );
+    }
+
     void loadThread();
     window.addEventListener("dashboard-chat:refresh", handleRefresh);
     window.addEventListener("dashboard-chat:pending-start", handlePendingStart);
     window.addEventListener("dashboard-chat:pending-delta", handlePendingDelta);
     window.addEventListener("dashboard-chat:pending-end", handlePendingEnd);
+    window.addEventListener("dashboard-chat:assistant-done", handleAssistantDone);
 
     return () => {
       isMounted = false;
@@ -128,10 +202,11 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       window.removeEventListener("dashboard-chat:pending-start", handlePendingStart);
       window.removeEventListener("dashboard-chat:pending-delta", handlePendingDelta);
       window.removeEventListener("dashboard-chat:pending-end", handlePendingEnd);
+      window.removeEventListener("dashboard-chat:assistant-done", handleAssistantDone);
     };
   }, [threadId]);
 
-  if (state === "loading") {
+  if (state === "loading" && pendingMessages.length === 0) {
     return (
       <div className={styles.chatCanvas}>
         <section className={styles.messageCluster}>
@@ -157,97 +232,13 @@ export function ThreadView({ threadId }: ThreadViewProps) {
     );
   }
 
-  async function handleRenameThread() {
-    if (!thread || isRenaming || isArchiving) {
-      return;
-    }
-
-    const proposedTitle = window.prompt("Rename this chat", thread.title ?? "");
-
-    if (proposedTitle === null) {
-      return;
-    }
-
-    const nextTitle = proposedTitle.trim();
-
-    if (!nextTitle) {
-      setActionMessage("A chat title can't be empty.");
-      return;
-    }
-
-    setIsRenaming(true);
-    setActionMessage(null);
-
-    try {
-      const response = await renameDashboardThreadRequest(thread.id, nextTitle);
-      setThread(response.thread);
-      setActionMessage("Chat renamed.");
-      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh", { detail: { threadId } }));
-    } catch (error) {
-      setActionMessage(
-        error instanceof Error ? error.message : "We couldn't rename that chat right now.",
-      );
-    } finally {
-      setIsRenaming(false);
-    }
-  }
-
-  async function handleArchiveThread() {
-    if (!thread || isArchiving || isRenaming) {
-      return;
-    }
-
-    const shouldArchive = window.confirm(
-      "Archive this chat? It will disappear from Recent Chats, but the messages will stay in the database.",
-    );
-
-    if (!shouldArchive) {
-      return;
-    }
-
-    setIsArchiving(true);
-    setActionMessage(null);
-
-    try {
-      await archiveDashboardThreadRequest(thread.id);
-      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh"));
-      router.push("/dashboard");
-    } catch (error) {
-      setActionMessage(
-        error instanceof Error ? error.message : "We couldn't archive that chat right now.",
-      );
-      setIsArchiving(false);
-    }
-  }
-
   return (
     <div className={styles.chatCanvas}>
-      <section className={styles.homeHero}>
-        <p className={styles.eyebrow}>Chat</p>
-        <h2 className={styles.homeTitle}>{thread.title ?? "Recent chat"}</h2>
-        <p className={styles.heroCopy}>
-          This is one of your saved Glint conversations. Keep going below, or start a new one from
-          the drawer.
-        </p>
-        <div className={styles.inlineActionRow}>
-          <button
-            className={styles.textActionButton}
-            disabled={isRenaming || isArchiving}
-            onClick={() => void handleRenameThread()}
-            type="button"
-          >
-            {isRenaming ? "Renaming..." : "Rename"}
-          </button>
-          <button
-            className={styles.textActionButton}
-            disabled={isArchiving || isRenaming}
-            onClick={() => void handleArchiveThread()}
-            type="button"
-          >
-            {isArchiving ? "Archiving..." : "Archive"}
-          </button>
+      <section className={styles.threadHeader}>
+        <div>
+          <p className={styles.eyebrow}>Chat</p>
+          <h1 className={styles.threadTitleLarge}>{thread.title ?? "Recent chat"}</h1>
         </div>
-        {actionMessage ? <p className={styles.inlineStatus}>{actionMessage}</p> : null}
       </section>
 
       {messages.length === 0 ? (
@@ -260,7 +251,9 @@ export function ThreadView({ threadId }: ThreadViewProps) {
         />
       ) : null}
 
-      <DashboardMessageList messages={messages} />
+      <div className={styles.transcriptStack}>
+        <DashboardMessageList messages={messages} />
+      </div>
       <DashboardPendingMessageList messages={pendingMessages} />
     </div>
   );

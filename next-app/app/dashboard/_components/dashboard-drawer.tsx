@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import {
+  deleteDashboardThreadRequest,
   listDashboardThreadsRequest,
-  restoreDashboardThreadRequest,
+  renameDashboardThreadRequest,
   type DashboardThread,
 } from "@/lib/dashboard/chat-api";
 import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-api";
@@ -19,14 +20,15 @@ type DashboardDrawerProps = {
 
 export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [areMatchesOpen, setAreMatchesOpen] = useState(true);
-  const [areArchivedOpen, setAreArchivedOpen] = useState(false);
   const [generalThreads, setGeneralThreads] = useState<DashboardThread[]>([]);
-  const [archivedThreads, setArchivedThreads] = useState<DashboardThread[]>([]);
   const [matchThreads, setMatchThreads] = useState<MatchThread[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
-  const [isLoadingArchivedThreads, setIsLoadingArchivedThreads] = useState(true);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+  const [threadActionId, setThreadActionId] = useState<string | null>(null);
+  const [busyThreadId, setBusyThreadId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
 
   function formatThreadPrimaryText(thread: DashboardThread) {
     return thread.title ?? thread.latest_message_preview ?? "Untitled chat";
@@ -63,23 +65,16 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
 
     async function loadGeneralThreads() {
       try {
-        const [activeResponse, archivedResponse] = await Promise.all([
-          listDashboardThreadsRequest(),
-          listDashboardThreadsRequest({ archived: "only" }),
-        ]);
+        const activeResponse = await listDashboardThreadsRequest();
 
         if (isMounted) {
           setGeneralThreads(activeResponse.threads);
-          setArchivedThreads(archivedResponse.threads);
           setIsLoadingThreads(false);
-          setIsLoadingArchivedThreads(false);
         }
       } catch {
         if (isMounted) {
           setGeneralThreads([]);
-          setArchivedThreads([]);
           setIsLoadingThreads(false);
-          setIsLoadingArchivedThreads(false);
         }
       }
     }
@@ -102,7 +97,6 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
 
     function handleRefresh() {
       setIsLoadingThreads(true);
-      setIsLoadingArchivedThreads(true);
       setIsLoadingMatches(true);
       void loadGeneralThreads();
       void loadMatchThreads();
@@ -118,12 +112,85 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
     };
   }, []);
 
-  async function handleRestoreThread(threadId: string) {
+  useEffect(() => () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+  }, []);
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function startLongPress(threadId: string) {
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      setThreadActionId(threadId);
+    }, 420);
+  }
+
+  async function handleRenameThread(thread: DashboardThread) {
+    if (busyThreadId) {
+      return;
+    }
+
+    const proposedTitle = window.prompt("Rename this chat", thread.title ?? "");
+
+    if (proposedTitle === null) {
+      return;
+    }
+
+    const nextTitle = proposedTitle.trim();
+
+    if (!nextTitle) {
+      return;
+    }
+
     try {
-      await restoreDashboardThreadRequest(threadId);
-      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh"));
+      setBusyThreadId(thread.id);
+      const response = await renameDashboardThreadRequest(thread.id, nextTitle);
+      setGeneralThreads((current) =>
+        current.map((entry) => (entry.id === thread.id ? response.thread : entry)),
+      );
     } catch {
-      // Keep the drawer quiet on restore failures for now.
+      // Keep the drawer quiet for now.
+    } finally {
+      setBusyThreadId(null);
+      setThreadActionId(null);
+    }
+  }
+
+  async function handleDeleteThread(thread: DashboardThread) {
+    if (busyThreadId) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      "Delete this chat permanently? This will remove the thread and all of its messages.",
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      setBusyThreadId(thread.id);
+      await deleteDashboardThreadRequest(thread.id);
+      setGeneralThreads((current) => current.filter((entry) => entry.id !== thread.id));
+      setThreadActionId(null);
+
+      if (pathname === `/dashboard/threads/${thread.id}`) {
+        router.push("/dashboard");
+      }
+
+      window.dispatchEvent(new CustomEvent("dashboard-chat:refresh", { detail: { scope: "lists" } }));
+    } catch {
+      // Keep the drawer quiet for now.
+    } finally {
+      setBusyThreadId(null);
     }
   }
 
@@ -162,96 +229,10 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
             <span>New Chat</span>
           </Link>
 
-          <div className={styles.drawerSectionLabel}>Recent Chats</div>
-          {generalThreads.length > 0 ? generalThreads.map((thread) => {
-            const href = `/dashboard/threads/${thread.id}`;
-            const isActive = pathname === href;
-
-            return (
-              <Link
-                className={isActive ? styles.drawerItemActive : styles.drawerItem}
-                href={href}
-                key={thread.id}
-                onClick={onClose}
-              >
-                <span aria-hidden="true" className={styles.drawerItemGlyph}>◌</span>
-                <span className={styles.drawerItemBody}>
-                  <span className={styles.drawerThreadRow}>
-                    <span className={styles.drawerThreadName}>
-                      {formatThreadPrimaryText(thread)}
-                    </span>
-                    {thread.last_message_at ? (
-                      <span className={styles.drawerThreadMeta}>
-                        {formatThreadTimestamp(thread.last_message_at)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={styles.drawerThreadPreview}>
-                    {formatThreadSecondaryText(thread)}
-                  </span>
-                </span>
-              </Link>
-            );
-          }) : (
-            <span className={styles.drawerEmptyText}>
-              {isLoadingThreads ? "Loading chats..." : "No recent chats yet"}
-            </span>
-          )}
-
-          <button
-            aria-expanded={areArchivedOpen}
-            className={styles.drawerGroupButton}
-            onClick={() => setAreArchivedOpen((isOpen) => !isOpen)}
-            type="button"
-          >
-            <span className={styles.drawerGroupLabel}>
-              <span aria-hidden="true">⌁</span>
-              <span>Archived Chats</span>
-            </span>
-            <span className={styles.drawerCount}>
-              {isLoadingArchivedThreads ? "…" : archivedThreads.length}
-            </span>
-          </button>
-
-          {areArchivedOpen ? (
-            <div className={styles.drawerSubList}>
-              {archivedThreads.length > 0 ? archivedThreads.map((thread) => (
-                <div className={styles.drawerArchivedItem} key={thread.id}>
-                  <div className={styles.drawerItemBody}>
-                    <span className={styles.drawerThreadRow}>
-                      <span className={styles.drawerThreadName}>
-                        {formatThreadPrimaryText(thread)}
-                      </span>
-                      {thread.archived_at ? (
-                        <span className={styles.drawerThreadMeta}>
-                          {formatThreadTimestamp(thread.archived_at)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={styles.drawerThreadPreview}>
-                      {formatThreadSecondaryText(thread)}
-                    </span>
-                  </div>
-                  <button
-                    className={styles.drawerRestoreButton}
-                    onClick={() => void handleRestoreThread(thread.id)}
-                    type="button"
-                  >
-                    Restore
-                  </button>
-                </div>
-              )) : (
-                <span className={styles.drawerEmptyText}>
-                  {isLoadingArchivedThreads ? "Loading archived chats..." : "No archived chats"}
-                </span>
-              )}
-            </div>
-          ) : null}
-
           <button
             aria-expanded={areMatchesOpen}
             className={styles.drawerGroupButton}
-            onClick={() => setAreMatchesOpen((isOpen) => !isOpen)}
+            onClick={() => setAreMatchesOpen((isOpenState) => !isOpenState)}
             type="button"
           >
             <span className={styles.drawerGroupLabel}>
@@ -303,6 +284,78 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
               )}
             </div>
           ) : null}
+
+          <div className={styles.drawerSectionLabel}>Recent Chats</div>
+          {generalThreads.length > 0 ? generalThreads.map((thread) => {
+            const href = `/dashboard/threads/${thread.id}`;
+            const isActive = pathname === href;
+            const isActionVisible = threadActionId === thread.id;
+            const isBusy = busyThreadId === thread.id;
+
+            return (
+              <div
+                className={styles.drawerThreadCard}
+                key={thread.id}
+                onMouseEnter={() => setThreadActionId(thread.id)}
+                onMouseLeave={() => setThreadActionId((current) => (current === thread.id ? null : current))}
+                onTouchEnd={clearLongPressTimer}
+                onTouchMove={clearLongPressTimer}
+                onTouchStart={() => startLongPress(thread.id)}
+              >
+                <Link
+                  className={isActive ? styles.drawerItemActive : styles.drawerItem}
+                  href={href}
+                  onClick={onClose}
+                >
+                  <span aria-hidden="true" className={styles.drawerItemGlyph}>◌</span>
+                  <span className={styles.drawerItemBody}>
+                    <span className={styles.drawerThreadRow}>
+                      <span className={styles.drawerThreadName}>
+                        {formatThreadPrimaryText(thread)}
+                      </span>
+                      {thread.last_message_at ? (
+                        <span className={styles.drawerThreadMeta}>
+                          {formatThreadTimestamp(thread.last_message_at)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className={styles.drawerThreadPreview}>
+                      {formatThreadSecondaryText(thread)}
+                    </span>
+                  </span>
+                </Link>
+
+                <div
+                  className={
+                    isActionVisible
+                      ? styles.drawerThreadActionsVisible
+                      : styles.drawerThreadActions
+                  }
+                >
+                  <button
+                    className={styles.drawerMiniAction}
+                    disabled={isBusy}
+                    onClick={() => void handleRenameThread(thread)}
+                    type="button"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    className={`${styles.drawerMiniAction} ${styles.drawerMiniActionDelete}`.trim()}
+                    disabled={isBusy}
+                    onClick={() => void handleDeleteThread(thread)}
+                    type="button"
+                  >
+                    {isBusy ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            );
+          }) : (
+            <span className={styles.drawerEmptyText}>
+              {isLoadingThreads ? "Loading chats..." : "No recent chats yet"}
+            </span>
+          )}
 
           <div className={styles.drawerSectionLabel}>Account</div>
           <Link

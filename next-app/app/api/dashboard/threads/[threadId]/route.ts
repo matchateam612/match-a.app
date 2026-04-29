@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { listMessagesForThread } from "@/lib/supabase/agent-messages";
-import { getThreadByIdForUser, updateThreadForUser } from "@/lib/supabase/agent-threads";
+import {
+  deleteThreadForUser,
+  getThreadByIdForUser,
+  updateThreadForUser,
+} from "@/lib/supabase/agent-threads";
 import { requireAuthenticatedUser } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
@@ -77,43 +81,12 @@ export async function DELETE(request: Request, { params }: DashboardThreadRouteP
       return jsonError("Thread not found.", 404);
     }
 
-    const updatedThread = await updateThreadForUser(user.id, threadId, {
-      archived_at: new Date().toISOString(),
-    });
+    await deleteThreadForUser(user.id, threadId);
 
-    return NextResponse.json({ thread: updatedThread });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return jsonError(
-      error instanceof Error ? error.message : "We couldn't archive that thread right now.",
-      500,
-    );
-  }
-}
-
-export async function POST(request: Request, { params }: DashboardThreadRouteProps) {
-  try {
-    const user = await requireAuthenticatedUser(request);
-    const { threadId } = await params;
-    const thread = await getThreadByIdForUser(user.id, threadId);
-
-    if (!thread) {
-      return jsonError("Thread not found.", 404);
-    }
-
-    const body = (await request.json().catch(() => null)) as { action?: unknown } | null;
-
-    if (body?.action !== "restore") {
-      return jsonError("Unsupported thread action.");
-    }
-
-    const updatedThread = await updateThreadForUser(user.id, threadId, {
-      archived_at: null,
-    });
-
-    return NextResponse.json({ thread: updatedThread });
-  } catch (error) {
-    return jsonError(
-      error instanceof Error ? error.message : "We couldn't restore that thread right now.",
+      error instanceof Error ? error.message : "We couldn't delete that thread right now.",
       500,
     );
   }

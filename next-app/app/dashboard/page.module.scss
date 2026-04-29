@@ -269,6 +269,10 @@
   color: var(--color-text-primary);
 }
 
+.drawerThreadCard {
+  position: relative;
+}
+
 .drawerItemGlyph {
   flex: 0 0 auto;
 }
@@ -306,23 +310,53 @@
   white-space: nowrap;
 }
 
-.drawerRestoreButton {
-  flex: 0 0 auto;
-  align-self: center;
-  padding: 7px 12px;
+.drawerEmptyText {
+  padding: 10px 14px;
+  color: var(--color-text-tertiary);
+  font-size: 0.9rem;
+}
+
+.drawerThreadActions,
+.drawerThreadActionsVisible {
+  position: absolute;
+  top: calc(100% - 8px);
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(147, 73, 55, 0.12);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-surface-primary) 96%, transparent);
+  box-shadow: $shadow-soft;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity $transition-base,
+    transform $transition-base;
+}
+
+.drawerThreadActionsVisible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.drawerMiniAction {
+  padding: 8px 12px;
   border: 0;
-  border-radius: $radius-pill;
-  background: rgba(147, 73, 55, 0.1);
-  color: var(--color-brand-primary);
+  border-radius: 999px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
   font-family: var(--font-geist-sans);
   font-size: 0.78rem;
   font-weight: 800;
 }
 
-.drawerEmptyText {
-  padding: 10px 14px;
-  color: var(--color-text-tertiary);
-  font-size: 0.9rem;
+.drawerMiniActionDelete {
+  background: rgba(227, 61, 61, 0.1);
+  color: #c63838;
 }
 
 .unreadDot {
@@ -344,11 +378,34 @@
   gap: 28px;
 }
 
+.transcriptStack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .homeHero {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding-top: 12px;
+}
+
+.threadHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.threadTitleLarge {
+  margin-top: 6px;
+  font-family: var(--font-geist-sans);
+  font-size: clamp(1.6rem, 7vw, 2.35rem);
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.06em;
 }
 
 .homeTitle {
@@ -809,6 +866,10 @@
   background: transparent;
   color: var(--color-brand-primary);
   font-weight: 850;
+}
+
+.destructiveTextAction {
+  color: #c63838;
 }
 
 .inlineStatus {
@@ -1674,6 +1735,10 @@
 
   .heroTitle {
     font-size: 2.8rem;
+  }
+
+  .threadHeader {
+    flex-direction: column;
   }
 
   .mapCard {

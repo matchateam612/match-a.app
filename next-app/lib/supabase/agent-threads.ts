@@ -228,6 +228,19 @@ export async function updateThreadForUser(
   return data as AgentThreadRow;
 }
 
+export async function deleteThreadForUser(userId: string, threadId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("agent_threads")
+    .delete()
+    .eq("id", threadId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function touchThreadAfterMessage(
   userId: string,
   threadId: string,

@@ -88,7 +88,7 @@ export async function renameDashboardThreadRequest(threadId: string, title: stri
   }>(response);
 }
 
-export async function archiveDashboardThreadRequest(threadId: string) {
+export async function deleteDashboardThreadRequest(threadId: string) {
   const headers = await buildAuthHeaders();
   const response = await fetch(`/api/dashboard/threads/${threadId}`, {
     method: "DELETE",
@@ -96,20 +96,7 @@ export async function archiveDashboardThreadRequest(threadId: string) {
   });
 
   return parseJsonResponse<{
-    thread: DashboardThread;
-  }>(response);
-}
-
-export async function restoreDashboardThreadRequest(threadId: string) {
-  const headers = await buildAuthHeaders();
-  const response = await fetch(`/api/dashboard/threads/${threadId}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ action: "restore" }),
-  });
-
-  return parseJsonResponse<{
-    thread: DashboardThread;
+    ok: true;
   }>(response);
 }
 
