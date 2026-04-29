@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import { listMatchedProfilePicturesRequest } from "@/lib/pictures/picture-api";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { listMatchesForUser } from "@/lib/supabase/matches";
+import {
+  listMatchThreadsRequest,
+  updateMatchDeclineRequest,
+  updateMatchSharedContactRequest,
+} from "@/lib/matches/match-api";
+import type { SharedContactType } from "@/lib/supabase/types";
 
-import { mapMatchesToRippleCards } from "../_lib/ripple-mappers";
 import type { RippleCard } from "../_lib/ripple-types";
 import { PotentialRipplesSection } from "./potential-ripples-section";
 
@@ -23,33 +25,23 @@ export function PotentialRipplesContainer() {
       setState("loading");
 
       try {
-        const user = await getCurrentUser();
-
-        if (!user) {
-          if (isMounted) {
-            setRipples([]);
-            setState("ready");
-          }
-
-          return;
-        }
-
-        const nextMatches = await listMatchesForUser(user.id);
-        const nextRipples = mapMatchesToRippleCards(nextMatches, user.id);
-        const picturesResponse =
-          nextMatches.length > 0
-            ? await listMatchedProfilePicturesRequest(nextMatches.map((match) => match.id))
-            : { pictures: [] };
-        const picturesByMatchId = new Map(
-          picturesResponse.pictures.map((picture) => [picture.matchId, picture.signedUrl]),
-        );
-        const ripplesWithPictures = nextRipples.map((ripple) => ({
-          ...ripple,
-          profilePictureUrl: picturesByMatchId.get(ripple.id) ?? null,
+        const response = await listMatchThreadsRequest();
+        const nextRipples: RippleCard[] = response.threads.map((thread) => ({
+          id: thread.id,
+          label: thread.label,
+          match_reason: thread.matchReason,
+          statusLabel: thread.statusLabel,
+          profilePictureUrl: thread.profilePictureUrl,
+          targetUserId: thread.targetUserId,
+          declined: thread.declined,
+          declineReason: thread.declineReason,
+          sharedContactType: thread.sharedContactType,
+          sharedContactValue: thread.sharedContactValue,
+          hasSharedContact: thread.hasSharedContact,
         }));
 
         if (isMounted) {
-          setRipples(ripplesWithPictures);
+          setRipples(nextRipples);
           setState("ready");
         }
       } catch {
@@ -67,9 +59,67 @@ export function PotentialRipplesContainer() {
     };
   }, []);
 
+  async function handleToggleDecline(matchId: string, declined: boolean, reason?: string) {
+    const response = await updateMatchDeclineRequest(matchId, {
+      declined,
+      reason,
+    });
+
+    setRipples((current) =>
+      current.map((ripple) =>
+        ripple.id === matchId
+          ? {
+              ...ripple,
+              declined: response.declined,
+              declineReason: response.declineReason,
+              sharedContactType: response.sharedContactType,
+              sharedContactValue: response.sharedContactValue,
+              hasSharedContact: response.hasSharedContact,
+            }
+          : ripple,
+      ),
+    );
+  }
+
+  async function handleSaveSharedContact(
+    matchId: string,
+    type: SharedContactType,
+    value: string,
+  ) {
+    const response = await updateMatchSharedContactRequest(matchId, {
+      type,
+      value,
+    });
+
+    setRipples((current) =>
+      current.map((ripple) =>
+        ripple.id === matchId
+          ? {
+              ...ripple,
+              declined: response.declined,
+              declineReason: response.declineReason,
+              sharedContactType: response.sharedContactType,
+              sharedContactValue: response.sharedContactValue,
+              hasSharedContact: response.hasSharedContact,
+            }
+          : ripple,
+      ),
+    );
+
+    if (response.mutualRevealTriggered) {
+      window.dispatchEvent(
+        new CustomEvent("dashboard-chat:refresh", {
+          detail: { routeKind: "match", routeId: matchId },
+        }),
+      );
+    }
+  }
+
   return (
     <PotentialRipplesSection
       isLoading={state === "loading" || state === "idle"}
+      onSaveSharedContact={handleSaveSharedContact}
+      onToggleDecline={handleToggleDecline}
       ripples={ripples}
     />
   );

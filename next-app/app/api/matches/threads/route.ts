@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { logPictureError } from "@/lib/pictures/picture-logging";
 import { getProfilePictureSignedUrl } from "@/lib/pictures/picture-server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { listMatchUserActionsForUser } from "@/lib/supabase/match-user-actions";
 import { requireAuthenticatedUser } from "@/lib/supabase/server-auth";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MatchRecord } from "@/lib/supabase/types";
@@ -65,6 +66,11 @@ export async function GET(request: Request) {
     }
 
     const matchRows = (matches ?? []) as MatchRecord[];
+    const actionRows = await listMatchUserActionsForUser(
+      matchRows.map((match) => match.id),
+      user.id,
+    );
+    const actionsByMatchId = new Map(actionRows.map((action) => [action.match_id, action]));
     const targetUserIds = Array.from(
       new Set(matchRows.map((match) => getCounterpartyUserId(match, user.id))),
     );
@@ -94,6 +100,7 @@ export async function GET(request: Request) {
       matchRows.map(async (match, index) => {
         const targetUserId = getCounterpartyUserId(match, user.id);
         const profile = profilesByUserId.get(targetUserId) ?? null;
+        const action = actionsByMatchId.get(match.id) ?? null;
         let profilePictureUrl: string | null = null;
 
         try {
@@ -121,6 +128,11 @@ export async function GET(request: Request) {
           profilePictureUrl,
           statusLabel: toStatusLabel(match),
           unread: true,
+          declined: action?.declined ?? false,
+          declineReason: action?.decline_reason ?? null,
+          sharedContactType: action?.shared_contact_type ?? null,
+          sharedContactValue: action?.shared_contact_value ?? null,
+          hasSharedContact: Boolean(action?.shared_contact_type && action?.shared_contact_value),
         };
       }),
     );

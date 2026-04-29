@@ -1597,6 +1597,93 @@
   font-size: 12px;
 }
 
+.rippleActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rippleActionPrimary,
+.rippleActionSecondary,
+.rippleInlineButton,
+.rippleInlineGhost {
+  min-height: 38px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.rippleActionPrimary,
+.rippleInlineButton {
+  background: var(--color-brand-primary);
+  color: white;
+}
+
+.rippleActionSecondary,
+.rippleInlineGhost {
+  border-color: color-mix(in srgb, var(--color-border-strong) 72%, transparent);
+  background: color-mix(in srgb, var(--color-surface-secondary) 84%, transparent);
+  color: var(--color-text-primary);
+}
+
+.rippleActionPrimary:disabled,
+.rippleActionSecondary:disabled,
+.rippleInlineButton:disabled,
+.rippleInlineGhost:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.rippleInlinePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-surface-secondary) 82%, transparent);
+}
+
+.rippleFieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rippleTextarea,
+.rippleSelect,
+.rippleInput {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 80%, transparent);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+
+.rippleTextarea {
+  resize: vertical;
+}
+
+.rippleInlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rippleError {
+  color: #a63131;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .skeletonBlock,
 .skeletonShort,
 .skeletonTiny,

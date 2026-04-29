@@ -1,6 +1,7 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { SharedContactType } from "@/lib/supabase/types";
 
 export type MatchThread = {
   id: string;
@@ -17,6 +18,11 @@ export type MatchThread = {
   profilePictureUrl: string | null;
   statusLabel: string | null;
   unread: boolean;
+  declined: boolean;
+  declineReason: string | null;
+  sharedContactType: SharedContactType | null;
+  sharedContactValue: string | null;
+  hasSharedContact: boolean;
 };
 
 async function buildAuthHeaders() {
@@ -59,4 +65,74 @@ export async function listMatchThreadsRequest() {
   });
 
   return parseJsonResponse<{ threads: MatchThread[] }>(response);
+}
+
+export async function getMatchActionsRequest(matchId: string) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/matches/${matchId}/actions`, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  });
+
+  return parseJsonResponse<{
+    declined: boolean;
+    declineReason: string | null;
+    sharedContactType: SharedContactType | null;
+    sharedContactValue: string | null;
+    hasSharedContact: boolean;
+  }>(response);
+}
+
+export async function updateMatchDeclineRequest(
+  matchId: string,
+  body: {
+    declined: boolean;
+    reason?: string;
+  },
+) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/matches/${matchId}/decline`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  return parseJsonResponse<{
+    declined: boolean;
+    declineReason: string | null;
+    sharedContactType: SharedContactType | null;
+    sharedContactValue: string | null;
+    hasSharedContact: boolean;
+  }>(response);
+}
+
+export async function updateMatchSharedContactRequest(
+  matchId: string,
+  body: {
+    type: SharedContactType;
+    value: string;
+  },
+) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/matches/${matchId}/share-contact`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  return parseJsonResponse<{
+    declined: boolean;
+    declineReason: string | null;
+    sharedContactType: SharedContactType | null;
+    sharedContactValue: string | null;
+    hasSharedContact: boolean;
+    mutualRevealTriggered: boolean;
+  }>(response);
 }

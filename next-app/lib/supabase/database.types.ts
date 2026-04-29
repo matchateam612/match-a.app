@@ -48,6 +48,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      match_user_actions: {
+        Row: {
+          id: string;
+          match_id: string;
+          user_id: string;
+          declined: boolean;
+          decline_reason: string | null;
+          shared_contact_type: "phone" | "whatsapp" | "instagram" | "wechat" | null;
+          shared_contact_value: string | null;
+          contact_shared_at: string | null;
+          contact_revealed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          match_id: string;
+          user_id: string;
+          declined?: boolean;
+          decline_reason?: string | null;
+          shared_contact_type?: "phone" | "whatsapp" | "instagram" | "wechat" | null;
+          shared_contact_value?: string | null;
+          contact_shared_at?: string | null;
+          contact_revealed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          match_id?: string;
+          user_id?: string;
+          declined?: boolean;
+          decline_reason?: string | null;
+          shared_contact_type?: "phone" | "whatsapp" | "instagram" | "wechat" | null;
+          shared_contact_value?: string | null;
+          contact_shared_at?: string | null;
+          contact_revealed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       agent_memories: {
         Row: {
           id: string;

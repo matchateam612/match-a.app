@@ -3,6 +3,7 @@ export type AgentThreadKind = "general" | "match";
 export type AgentMessageRole = "user" | "assistant" | "system";
 export type AgentMessageStatus = "pending" | "completed" | "failed";
 export type AgentMemoryStatus = "active" | "discarded" | "superseded";
+export type SharedContactType = "phone" | "whatsapp" | "instagram" | "wechat";
 
 export type MatchRecord = {
   id: string;
@@ -11,6 +12,20 @@ export type MatchRecord = {
   match_reason: string | null;
   user1_match_status: MatchStatus;
   user2_match_status: MatchStatus;
+};
+
+export type MatchUserActionRow = {
+  id: string;
+  match_id: string;
+  user_id: string;
+  declined: boolean;
+  decline_reason: string | null;
+  shared_contact_type: SharedContactType | null;
+  shared_contact_value: string | null;
+  contact_shared_at: string | null;
+  contact_revealed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AgentThreadRow = {

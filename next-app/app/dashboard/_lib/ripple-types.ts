@@ -1,3 +1,5 @@
+import type { SharedContactType } from "@/lib/supabase/types";
+
 export type RippleCard = {
   id: string;
   label: string;
@@ -5,5 +7,9 @@ export type RippleCard = {
   statusLabel: string | null;
   profilePictureUrl: string | null;
   targetUserId: string;
-  userIds: [string, string];
+  declined: boolean;
+  declineReason: string | null;
+  sharedContactType: SharedContactType | null;
+  sharedContactValue: string | null;
+  hasSharedContact: boolean;
 };
