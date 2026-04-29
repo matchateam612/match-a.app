@@ -27,6 +27,15 @@ function primeSpeechSynthesis() {
   window.speechSynthesis.resume();
 }
 
+async function requestMicrophonePermission() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("This browser does not support microphone access here.");
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getTracks().forEach((track) => track.stop());
+}
+
 export function AgentModalityPage() {
   const isClientReady = useClientReady();
 
@@ -104,19 +113,29 @@ function AgentModalityPageClient() {
       return;
     }
 
+    let resolvedMode: AgentConversationMode = selectedMode;
     setSaveError("");
     setSaveMessage(selectedMode === "voice" ? "Opening voice-first chat..." : "Opening text-first chat...");
     setIsSelecting(true);
 
     try {
       if (selectedMode === "voice") {
+        try {
+          await requestMicrophonePermission();
+        } catch {
+          resolvedMode = "text";
+          setSelectedMode("text");
+          setSaveMessage("Microphone access was not allowed, so we switched you to text chat.");
+          setSaveError("");
+        }
+
         primeSpeechSynthesis();
       }
 
       const storedState = await readStoredAgentStateFromIdb(criteriaDefinitions, promptSettings);
       const nextDraft = {
         ...storedState.draft,
-        selectedMode,
+        selectedMode: resolvedMode,
       };
       const nextProgress = nextDraft.status;
 

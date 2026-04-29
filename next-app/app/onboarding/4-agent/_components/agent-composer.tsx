@@ -54,6 +54,7 @@ function useVoiceNoteRecorder({
   const chunksRef = useRef<BlobPart[]>([]);
   const pointerIdRef = useRef<number | null>(null);
   const startYRef = useRef(0);
+  const recordingStartedAtRef = useRef(0);
   const recordingStateRef = useRef<"idle" | "recording" | "cancel-armed" | "processing">("idle");
 
   useEffect(() => {
@@ -97,6 +98,7 @@ function useVoiceNoteRecorder({
     chunksRef.current = [];
     pointerIdRef.current = pointerId;
     startYRef.current = startY;
+    recordingStartedAtRef.current = Date.now();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -115,6 +117,7 @@ function useVoiceNoteRecorder({
       });
       mediaRecorder.addEventListener("stop", () => {
         const shouldCancel = recordingStateRef.current === "cancel-armed";
+        const recordingDurationMs = Date.now() - recordingStartedAtRef.current;
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
         mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
         mediaStreamRef.current = null;
@@ -122,6 +125,12 @@ function useVoiceNoteRecorder({
         chunksRef.current = [];
 
         if (shouldCancel || blob.size === 0) {
+          setRecordingState("idle");
+          return;
+        }
+
+        if (recordingDurationMs < 500) {
+          setRecordingError("Voice note failed because it was too short.");
           setRecordingState("idle");
           return;
         }
@@ -226,20 +235,22 @@ export function AgentComposer({
         </div>
       ) : null}
 
-      {isRecording ? (
-        <div className={styles.agentVoiceRecordingHint} aria-live="polite">
-          <div className={styles.agentVoiceWave} aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
+      <div className={styles.agentComposerOverlay} aria-hidden={!isRecording}>
+        {isRecording ? (
+          <div className={styles.agentVoiceRecordingHint} aria-live="polite">
+            <div className={styles.agentVoiceWave} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            <p className={styles.agentVoiceRecordingText}>
+              {recordingState === "cancel-armed" ? "Release to cancel" : "Listening... swipe up to cancel"}
+            </p>
           </div>
-          <p className={styles.agentVoiceRecordingText}>
-            {recordingState === "cancel-armed" ? "Release to cancel" : "Listening... swipe up to cancel"}
-          </p>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <div className={styles.agentComposerBar}>
         <button
