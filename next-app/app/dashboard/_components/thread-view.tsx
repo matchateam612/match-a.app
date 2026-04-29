@@ -191,12 +191,13 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       setOptimisticUserMessage(null);
       setMessages((current) => {
         const nextMessages = [...current];
+        const savedUserMessage = detail.userMessage;
 
         if (
-          detail.userMessage &&
-          !nextMessages.some((message) => message.id === detail.userMessage.id)
+          savedUserMessage &&
+          !nextMessages.some((message) => message.id === savedUserMessage.id)
         ) {
-          nextMessages.push(detail.userMessage);
+          nextMessages.push(savedUserMessage);
         }
 
         if (!nextMessages.some((message) => message.id === detail.assistantMessage.id)) {
