@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { listMatchThreadsRequest } from "@/lib/matches/match-api";
 import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
+import { PotentialRipplesContainer } from "./potential-ripples-container";
 import styles from "../page.module.scss";
 
 export function DashboardHome() {
@@ -71,6 +72,8 @@ export function DashboardHome() {
             : "When Glint finds a new match, it will appear in the Matches section so you can ask about them directly."}
         </p>
       </section>
+
+      <PotentialRipplesContainer />
     </div>
   );
 }
