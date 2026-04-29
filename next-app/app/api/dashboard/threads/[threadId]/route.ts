@@ -89,3 +89,32 @@ export async function DELETE(request: Request, { params }: DashboardThreadRouteP
     );
   }
 }
+
+export async function POST(request: Request, { params }: DashboardThreadRouteProps) {
+  try {
+    const user = await requireAuthenticatedUser(request);
+    const { threadId } = await params;
+    const thread = await getThreadByIdForUser(user.id, threadId);
+
+    if (!thread) {
+      return jsonError("Thread not found.", 404);
+    }
+
+    const body = (await request.json().catch(() => null)) as { action?: unknown } | null;
+
+    if (body?.action !== "restore") {
+      return jsonError("Unsupported thread action.");
+    }
+
+    const updatedThread = await updateThreadForUser(user.id, threadId, {
+      archived_at: null,
+    });
+
+    return NextResponse.json({ thread: updatedThread });
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "We couldn't restore that thread right now.",
+      500,
+    );
+  }
+}

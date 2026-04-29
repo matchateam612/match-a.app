@@ -12,7 +12,13 @@ function jsonError(message: string, status = 400) {
 export async function GET(request: Request) {
   try {
     const user = await requireAuthenticatedUser(request);
-    const threads = await listThreadsForUser(user.id, "general");
+    const { searchParams } = new URL(request.url);
+    const archivedOnly = searchParams.get("archived") === "only";
+    const includeArchived = searchParams.get("archived") === "all";
+    const threads = await listThreadsForUser(user.id, "general", {
+      archivedOnly,
+      includeArchived,
+    });
 
     return NextResponse.json({ threads });
   } catch (error) {

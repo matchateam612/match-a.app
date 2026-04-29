@@ -24,14 +24,26 @@ function asAgentThreadRows(
   return (value ?? []) as AgentThreadRow[];
 }
 
-export async function listThreadsForUser(userId: string, kind?: AgentThreadKind) {
+export async function listThreadsForUser(
+  userId: string,
+  kind?: AgentThreadKind,
+  options?: {
+    includeArchived?: boolean;
+    archivedOnly?: boolean;
+  },
+) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("agent_threads")
     .select("*")
     .eq("user_id", userId)
-    .is("archived_at", null)
     .order("updated_at", { ascending: false });
+
+  if (options?.archivedOnly) {
+    query = query.not("archived_at", "is", null);
+  } else if (!options?.includeArchived) {
+    query = query.is("archived_at", null);
+  }
 
   if (kind) {
     query = query.eq("kind", kind);

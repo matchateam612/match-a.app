@@ -91,6 +91,8 @@ export function ThreadView({ threadId }: ThreadViewProps) {
         return;
       }
 
+      const deltaText = detail.delta;
+
       setPendingMessages((current) => {
         if (current.length === 0) {
           return current;
@@ -102,8 +104,8 @@ export function ThreadView({ threadId }: ThreadViewProps) {
                 ...message,
                 content:
                   message.content === "Glint is thinking..."
-                    ? detail.delta
-                    : `${message.content}${detail.delta}`,
+                    ? deltaText
+                    : `${message.content}${deltaText}`,
               }
             : message,
         );

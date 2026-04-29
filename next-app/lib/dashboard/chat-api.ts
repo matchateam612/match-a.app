@@ -45,9 +45,14 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-export async function listDashboardThreadsRequest() {
+export async function listDashboardThreadsRequest(options?: {
+  archived?: "active" | "all" | "only";
+}) {
   const headers = await buildAuthHeaders();
-  const response = await fetch("/api/dashboard/threads", {
+  const archived = options?.archived;
+  const query =
+    archived && archived !== "active" ? `?archived=${archived === "only" ? "only" : "all"}` : "";
+  const response = await fetch(`/api/dashboard/threads${query}`, {
     method: "GET",
     headers,
     cache: "no-store",
@@ -88,6 +93,19 @@ export async function archiveDashboardThreadRequest(threadId: string) {
   const response = await fetch(`/api/dashboard/threads/${threadId}`, {
     method: "DELETE",
     headers,
+  });
+
+  return parseJsonResponse<{
+    thread: DashboardThread;
+  }>(response);
+}
+
+export async function restoreDashboardThreadRequest(threadId: string) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/dashboard/threads/${threadId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ action: "restore" }),
   });
 
   return parseJsonResponse<{

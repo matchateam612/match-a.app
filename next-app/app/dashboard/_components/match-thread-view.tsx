@@ -95,6 +95,8 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
         return;
       }
 
+      const deltaText = detail.delta;
+
       setPendingMessages((current) => {
         if (current.length === 0) {
           return current;
@@ -106,8 +108,8 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
                 ...message,
                 content:
                   message.content === "Glint is looking through this match..."
-                    ? detail.delta
-                    : `${message.content}${detail.delta}`,
+                    ? deltaText
+                    : `${message.content}${deltaText}`,
               }
             : message,
         );

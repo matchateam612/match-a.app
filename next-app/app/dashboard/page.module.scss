@@ -194,7 +194,8 @@
 .drawerItemActive,
 .drawerGroupButton,
 .drawerSubItem,
-.drawerSubItemActive {
+.drawerSubItemActive,
+.drawerArchivedItem {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -250,8 +251,17 @@
 
 .drawerSubItem,
 .drawerSubItemActive {
+  align-items: flex-start;
   justify-content: space-between;
   padding: 11px 14px;
+}
+
+.drawerArchivedItem {
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-surface-secondary) 72%, transparent);
 }
 
 .drawerSubItemActive {
@@ -259,10 +269,54 @@
   color: var(--color-text-primary);
 }
 
+.drawerItemGlyph {
+  flex: 0 0 auto;
+}
+
+.drawerItemBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawerThreadRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .drawerThreadName {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.drawerThreadPreview,
+.drawerThreadMeta {
+  color: var(--color-text-tertiary);
+  font-size: 0.8rem;
+}
+
+.drawerThreadPreview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawerRestoreButton {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: $radius-pill;
+  background: rgba(147, 73, 55, 0.1);
+  color: var(--color-brand-primary);
+  font-family: var(--font-geist-sans);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .drawerEmptyText {
