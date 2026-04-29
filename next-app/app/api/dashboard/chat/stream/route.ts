@@ -1,4 +1,4 @@
-import { createOpenAiCompatibleChatCompletion, createOpenAiCompatibleChatCompletionStream } from "@/lib/llm/openai-compatible";
+import { createOpenAiCompatibleChatCompletionStream } from "@/lib/llm/openai-compatible";
 import { extractAndSaveMemories } from "@/lib/dashboard/memory-extractor";
 import { buildThreadSummary } from "@/lib/dashboard/thread-summary";
 import { getLlmEnv } from "@/lib/llm/env";
@@ -76,6 +76,19 @@ function compactText(value: string, maxLength = 140) {
 
 function buildThreadTitleFromMessage(value: string) {
   return compactText(value, 60);
+}
+
+function buildFallbackAssistantReply(
+  context: Awaited<ReturnType<typeof loadAgentTurnContext>>,
+) {
+  return context.thread.kind === "match" && context.matchContext?.counterparty
+    ? `I’m looking at this match through the context I have so far. ${
+        context.matchContext.counterparty.agent_summary ??
+        context.matchContext.counterparty.mentality_summary ??
+        context.matchContext.match.match_reason ??
+        "I can help you think through this match."
+      } Ask me about compatibility, what stands out, or how you might start the conversation.`
+    : "I’m here with you. Tell me a little more about what you want help thinking through, and I’ll help you sort it out.";
 }
 
 function buildSystemPrompt(context: Awaited<ReturnType<typeof loadAgentTurnContext>>) {
@@ -173,15 +186,7 @@ async function getAssistantStream(context: Awaited<ReturnType<typeof loadAgentTu
   }));
 
   if (!env.apiKey) {
-    const text =
-      context.thread.kind === "match" && context.matchContext?.counterparty
-        ? `I’m looking at this match through the context I have so far. ${
-            context.matchContext.counterparty.agent_summary ??
-            context.matchContext.counterparty.mentality_summary ??
-            context.matchContext.match.match_reason ??
-            "I can help you think through this match."
-          } Ask me about compatibility, what stands out, or how you might start the conversation.`
-        : "I’m here with you. Tell me a little more about what you want help thinking through, and I’ll help you sort it out.";
+    const text = buildFallbackAssistantReply(context);
 
     async function* fallbackStream() {
       yield text;
@@ -190,17 +195,33 @@ async function getAssistantStream(context: Awaited<ReturnType<typeof loadAgentTu
     return fallbackStream();
   }
 
-  return createOpenAiCompatibleChatCompletionStream({
-    model: env.interviewerModel,
-    temperature: 0.7,
-    messages: [
-      {
-        role: "system",
-        content: buildSystemPrompt(context),
-      },
-      ...transcript,
-    ],
-  });
+  try {
+    return await createOpenAiCompatibleChatCompletionStream({
+      model: env.interviewerModel,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: buildSystemPrompt(context),
+        },
+        ...transcript,
+      ],
+    });
+  } catch (error) {
+    console.error("[dashboard-chat][stream] Assistant stream generation failed. Using fallback reply.", {
+      error: error instanceof Error ? error.message : String(error),
+      threadId: context.thread.id,
+      threadKind: context.thread.kind,
+    });
+
+    const text = buildFallbackAssistantReply(context);
+
+    async function* fallbackStream() {
+      yield text;
+    }
+
+    return fallbackStream();
+  }
 }
 
 export async function POST(request: Request) {
@@ -280,16 +301,7 @@ export async function POST(request: Request) {
 
           const finalAssistantReply = assistantReply.trim()
             ? assistantReply
-            : await createOpenAiCompatibleChatCompletion({
-                model: getLlmEnv().interviewerModel,
-                temperature: 0.7,
-                messages: [
-                  {
-                    role: "system",
-                    content: buildSystemPrompt(context),
-                  },
-                ],
-              });
+            : buildFallbackAssistantReply(context);
 
           const assistantMessage = await createAssistantMessage(
             threadId,
@@ -303,24 +315,39 @@ export async function POST(request: Request) {
 
           const updatedMessages = await listMessagesForThread(user.id, threadId);
 
-          if (updatedMessages.length >= 6 && updatedMessages.length % 4 === 0) {
-            const summary = await buildThreadSummary(updatedMessages);
+          try {
+            if (updatedMessages.length >= 6 && updatedMessages.length % 4 === 0) {
+              const summary = await buildThreadSummary(updatedMessages);
 
-            if (summary) {
-              await updateThreadForUser(user.id, threadId, {
-                summary,
-                summary_updated_at: new Date().toISOString(),
-              });
+              if (summary) {
+                await updateThreadForUser(user.id, threadId, {
+                  summary,
+                  summary_updated_at: new Date().toISOString(),
+                });
+              }
             }
+          } catch (error) {
+            console.error("[dashboard-chat][stream] Thread summary refresh failed.", {
+              error: error instanceof Error ? error.message : String(error),
+              threadId,
+            });
           }
 
-          await extractAndSaveMemories({
-            userId: user.id,
-            sourceThreadId: threadId,
-            sourceMessageId: userMessage.id,
-            userMessage: userMessage.content,
-            assistantMessage: assistantMessage.content,
-          });
+          try {
+            await extractAndSaveMemories({
+              userId: user.id,
+              sourceThreadId: threadId,
+              sourceMessageId: userMessage.id,
+              userMessage: userMessage.content,
+              assistantMessage: assistantMessage.content,
+            });
+          } catch (error) {
+            console.error("[dashboard-chat][stream] Memory extraction failed.", {
+              error: error instanceof Error ? error.message : String(error),
+              threadId,
+              userId: user.id,
+            });
+          }
 
           controller.enqueue(
             encoder.encode(
