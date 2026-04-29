@@ -117,3 +117,34 @@ export async function submitDashboardChatTurnRequest(
     assistantMessage: DashboardMessage;
   }>(response);
 }
+
+export async function listDashboardMemoriesRequest() {
+  const headers = await buildAuthHeaders();
+  const response = await fetch("/api/dashboard/memories", {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  });
+
+  return parseJsonResponse<{ memories: DashboardMemory[] }>(response);
+}
+
+export async function deleteDashboardMemoryRequest(memoryId: string) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/dashboard/memories/${memoryId}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  return parseJsonResponse<{ ok: true }>(response);
+}
+
+export async function clearDashboardMemoriesRequest() {
+  const headers = await buildAuthHeaders();
+  const response = await fetch("/api/dashboard/memories", {
+    method: "DELETE",
+    headers,
+  });
+
+  return parseJsonResponse<{ ok: true }>(response);
+}

@@ -753,6 +753,12 @@
   font-weight: 850;
 }
 
+.inlineStatus {
+  color: var(--color-text-tertiary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .memoryList {
   display: flex;
   flex-direction: column;
@@ -812,6 +818,12 @@
   background: transparent;
   color: var(--color-text-tertiary);
   font-size: 1.35rem;
+}
+
+.memoryDeleteButton:disabled,
+.dangerButton:disabled,
+.secondaryWideButton:disabled {
+  opacity: 0.65;
 }
 
 .secondaryWideButton {

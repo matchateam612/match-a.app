@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createOpenAiCompatibleChatCompletion } from "@/lib/llm/openai-compatible";
+import { extractAndSaveMemories } from "@/lib/dashboard/memory-extractor";
 import { getLlmEnv } from "@/lib/llm/env";
 import { loadAgentTurnContext } from "@/lib/supabase/agent-context";
 import {
@@ -12,6 +13,7 @@ import {
   createGeneralThread,
   findOrCreateMatchThread,
   touchThreadAfterMessage,
+  updateThreadForUser,
 } from "@/lib/supabase/agent-threads";
 import { requireAuthenticatedUser } from "@/lib/supabase/server-auth";
 
@@ -62,6 +64,10 @@ function isValidBody(body: unknown): body is ChatTurnRequest {
 function compactText(value: string, maxLength = 140) {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function buildThreadTitleFromMessage(value: string) {
+  return compactText(value, 60);
 }
 
 function buildSystemPrompt(context: Awaited<ReturnType<typeof loadAgentTurnContext>>) {
@@ -218,12 +224,25 @@ export async function POST(request: Request) {
     });
     await touchThreadAfterMessage(user.id, threadId, compactText(userMessage.content));
 
+    if (body.source === "new-chat") {
+      await updateThreadForUser(user.id, threadId, {
+        title: buildThreadTitleFromMessage(body.message),
+      });
+    }
+
     const context = await loadAgentTurnContext(user.id, threadId);
     const assistantReply = await generateAssistantReply(context);
     const assistantMessage = await createAssistantMessage(threadId, user.id, assistantReply, {
       source: body.source,
     });
     await touchThreadAfterMessage(user.id, threadId, compactText(assistantMessage.content));
+    await extractAndSaveMemories({
+      userId: user.id,
+      sourceThreadId: threadId,
+      sourceMessageId: userMessage.id,
+      userMessage: userMessage.content,
+      assistantMessage: assistantMessage.content,
+    });
 
     return NextResponse.json({
       threadId,
