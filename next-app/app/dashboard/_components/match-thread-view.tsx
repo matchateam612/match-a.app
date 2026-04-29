@@ -88,6 +88,32 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       }
     }
 
+    function handlePendingDelta(event: Event) {
+      const detail = (event as CustomEvent<{ delta?: string }>).detail;
+
+      if (!detail?.delta) {
+        return;
+      }
+
+      setPendingMessages((current) => {
+        if (current.length === 0) {
+          return current;
+        }
+
+        return current.map((message, index) =>
+          index === current.length - 1 && message.role === "assistant"
+            ? {
+                ...message,
+                content:
+                  message.content === "Glint is looking through this match..."
+                    ? detail.delta
+                    : `${message.content}${detail.delta}`,
+              }
+            : message,
+        );
+      });
+    }
+
     function handlePendingEnd() {
       setPendingMessages([]);
     }
@@ -95,12 +121,14 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
     void loadMatchThread();
     window.addEventListener("dashboard-chat:refresh", handleRefresh);
     window.addEventListener("dashboard-chat:pending-start", handlePendingStart);
+    window.addEventListener("dashboard-chat:pending-delta", handlePendingDelta);
     window.addEventListener("dashboard-chat:pending-end", handlePendingEnd);
 
     return () => {
       isMounted = false;
       window.removeEventListener("dashboard-chat:refresh", handleRefresh);
       window.removeEventListener("dashboard-chat:pending-start", handlePendingStart);
+      window.removeEventListener("dashboard-chat:pending-delta", handlePendingDelta);
       window.removeEventListener("dashboard-chat:pending-end", handlePendingEnd);
     };
   }, [matchId]);

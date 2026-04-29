@@ -66,9 +66,9 @@ export function ThreadView({ threadId }: ThreadViewProps) {
     }
 
     function handlePendingStart(event: Event) {
-      const detail = (event as CustomEvent<{ source?: string; threadId?: string; message?: string }>).detail;
+      const detail = (event as CustomEvent<{ threadId?: string; message?: string; routeKind?: string }>).detail;
 
-      if (detail?.source === "thread" && detail.threadId === threadId && detail.message) {
+      if (detail?.threadId === threadId && detail.message && (!detail.routeKind || detail.routeKind === "thread")) {
         setPendingMessages([
           {
             id: `pending-user-${Date.now()}`,
@@ -84,6 +84,32 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       }
     }
 
+    function handlePendingDelta(event: Event) {
+      const detail = (event as CustomEvent<{ delta?: string }>).detail;
+
+      if (!detail?.delta) {
+        return;
+      }
+
+      setPendingMessages((current) => {
+        if (current.length === 0) {
+          return current;
+        }
+
+        return current.map((message, index) =>
+          index === current.length - 1 && message.role === "assistant"
+            ? {
+                ...message,
+                content:
+                  message.content === "Glint is thinking..."
+                    ? detail.delta
+                    : `${message.content}${detail.delta}`,
+              }
+            : message,
+        );
+      });
+    }
+
     function handlePendingEnd() {
       setPendingMessages([]);
     }
@@ -91,12 +117,14 @@ export function ThreadView({ threadId }: ThreadViewProps) {
     void loadThread();
     window.addEventListener("dashboard-chat:refresh", handleRefresh);
     window.addEventListener("dashboard-chat:pending-start", handlePendingStart);
+    window.addEventListener("dashboard-chat:pending-delta", handlePendingDelta);
     window.addEventListener("dashboard-chat:pending-end", handlePendingEnd);
 
     return () => {
       isMounted = false;
       window.removeEventListener("dashboard-chat:refresh", handleRefresh);
       window.removeEventListener("dashboard-chat:pending-start", handlePendingStart);
+      window.removeEventListener("dashboard-chat:pending-delta", handlePendingDelta);
       window.removeEventListener("dashboard-chat:pending-end", handlePendingEnd);
     };
   }, [threadId]);

@@ -3,7 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { submitDashboardChatTurnRequest } from "@/lib/dashboard/chat-api";
+import {
+  submitDashboardChatTurnRequest,
+  submitDashboardChatTurnStreamRequest,
+} from "@/lib/dashboard/chat-api";
 
 import styles from "../page.module.scss";
 
@@ -72,35 +75,87 @@ export function DashboardComposer() {
       message: nextMessage,
     };
 
-    window.dispatchEvent(
-      new CustomEvent("dashboard-chat:pending-start", {
-        detail: payload,
-      }),
-    );
-
     try {
-      const result = await submitDashboardChatTurnRequest(payload);
+      let streamStarted = false;
 
-      setMessage("");
-      window.dispatchEvent(
-        new CustomEvent("dashboard-chat:refresh", {
-          detail: {
-            threadId: result.threadId,
-            routeKind: result.routeKind,
-            routeId: result.routeId,
-          },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
+      await submitDashboardChatTurnStreamRequest(payload, {
+        onMeta: (meta) => {
+          streamStarted = true;
+          setMessage("");
+          window.dispatchEvent(
+            new CustomEvent("dashboard-chat:pending-start", {
+              detail: {
+                source: payload.source,
+                threadId: meta.threadId,
+                routeKind: meta.routeKind,
+                routeId: meta.routeId,
+                matchId: meta.routeKind === "match" ? meta.routeId : undefined,
+                message: meta.userMessage.content,
+              },
+            }),
+          );
 
-      if (result.routeKind === "thread") {
-        router.push(`/dashboard/threads/${result.threadId}`);
-      } else {
-        router.push(`/dashboard/matches/${result.routeId}`);
+          if (meta.routeKind === "thread") {
+            router.push(`/dashboard/threads/${meta.threadId}`);
+          } else {
+            router.push(`/dashboard/matches/${meta.routeId}`);
+          }
+        },
+        onAssistantDelta: (delta) => {
+          window.dispatchEvent(
+            new CustomEvent("dashboard-chat:pending-delta", {
+              detail: { delta },
+            }),
+          );
+        },
+        onAssistantDone: (donePayload) => {
+          window.dispatchEvent(
+            new CustomEvent("dashboard-chat:refresh", {
+              detail: {
+                threadId: donePayload.threadId,
+                routeKind: donePayload.routeKind,
+                routeId: donePayload.routeId,
+              },
+            }),
+          );
+          window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
+        },
+      });
+
+      if (!streamStarted) {
+        throw new Error("The chat stream did not start.");
       }
     } catch (error) {
-      window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
-      setReply(error instanceof Error ? error.message : "We couldn't send that message.");
+      try {
+        const result = await submitDashboardChatTurnRequest(payload);
+
+        setMessage("");
+        window.dispatchEvent(
+          new CustomEvent("dashboard-chat:refresh", {
+            detail: {
+              threadId: result.threadId,
+              routeKind: result.routeKind,
+              routeId: result.routeId,
+            },
+          }),
+        );
+        window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
+
+        if (result.routeKind === "thread") {
+          router.push(`/dashboard/threads/${result.threadId}`);
+        } else {
+          router.push(`/dashboard/matches/${result.routeId}`);
+        }
+      } catch (fallbackError) {
+        window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
+        setReply(
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : error instanceof Error
+              ? error.message
+              : "We couldn't send that message.",
+        );
+      }
     } finally {
       setIsSending(false);
     }
