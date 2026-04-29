@@ -22,6 +22,10 @@ export function mapMatchesToRippleCards(matches: MatchRecord[], currentUserId: s
     statusLabel: toStatusLabel(match),
     profilePictureUrl: null,
     targetUserId: match.user1 === currentUserId ? match.user2 : match.user1,
-    userIds: [match.user1, match.user2],
+    declined: false,
+    declineReason: null,
+    sharedContactType: null,
+    sharedContactValue: null,
+    hasSharedContact: false,
   }));
 }
