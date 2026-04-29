@@ -7,8 +7,8 @@ export default function DashboardMatchesPage() {
         <p className={styles.eyebrow}>Matches</p>
         <h2 className={styles.homeTitle}>Choose a match from the menu.</h2>
         <p className={styles.heroCopy}>
-          Matches now live as expandable threads in the drawer. Open the menu
-          and pick Annie, Sunny, or Cherry to continue.
+          Open the Matches section in the drawer to start a focused conversation
+          about someone Glint found for you.
         </p>
       </section>
     </div>

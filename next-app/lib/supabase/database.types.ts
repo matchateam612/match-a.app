@@ -21,6 +21,156 @@ export type UserTier = "free" | "paid";
 export type Database = {
   public: {
     Tables: {
+      matches: {
+        Row: {
+          id: string;
+          user1: string;
+          user2: string;
+          match_reason: string | null;
+          user1_match_status: 0 | 1;
+          user2_match_status: 0 | 1;
+        };
+        Insert: {
+          id?: string;
+          user1: string;
+          user2: string;
+          match_reason?: string | null;
+          user1_match_status?: 0 | 1;
+          user2_match_status?: 0 | 1;
+        };
+        Update: {
+          id?: string;
+          user1?: string;
+          user2?: string;
+          match_reason?: string | null;
+          user1_match_status?: 0 | 1;
+          user2_match_status?: 0 | 1;
+        };
+        Relationships: [];
+      };
+      agent_memories: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_thread_id: string | null;
+          source_message_id: string | null;
+          kind: string;
+          content: string;
+          confidence: number | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_thread_id?: string | null;
+          source_message_id?: string | null;
+          kind: string;
+          content: string;
+          confidence?: number | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source_thread_id?: string | null;
+          source_message_id?: string | null;
+          kind?: string;
+          content?: string;
+          confidence?: number | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+      agent_messages: {
+        Row: {
+          id: string;
+          thread_id: string;
+          user_id: string;
+          role: string;
+          content: string;
+          status: string;
+          created_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          thread_id: string;
+          user_id: string;
+          role: string;
+          content: string;
+          status?: string;
+          created_at?: string;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          thread_id?: string;
+          user_id?: string;
+          role?: string;
+          content?: string;
+          status?: string;
+          created_at?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+      agent_threads: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          match_id: string | null;
+          title: string | null;
+          latest_message_preview: string | null;
+          created_at: string;
+          updated_at: string;
+          last_message_at: string | null;
+          archived_at: string | null;
+          summary: string | null;
+          summary_updated_at: string | null;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          kind: string;
+          match_id?: string | null;
+          title?: string | null;
+          latest_message_preview?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_message_at?: string | null;
+          archived_at?: string | null;
+          summary?: string | null;
+          summary_updated_at?: string | null;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: string;
+          match_id?: string | null;
+          title?: string | null;
+          latest_message_preview?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_message_at?: string | null;
+          archived_at?: string | null;
+          summary?: string | null;
+          summary_updated_at?: string | null;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
       user_basic_info: {
         Row: {
           user_id: string;

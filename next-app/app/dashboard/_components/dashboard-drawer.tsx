@@ -4,14 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { listDashboardThreadsRequest, type DashboardThread } from "@/lib/dashboard/chat-api";
 import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-api";
 import styles from "../page.module.scss";
-
-const agentThreads = [
-  { id: "tonight-plans", label: "Tonight plans" },
-  { id: "profile-tune-up", label: "Profile tune-up" },
-  { id: "match-strategy", label: "Match strategy" },
-] as const;
 
 type DashboardDrawerProps = {
   isOpen: boolean;
@@ -21,11 +16,29 @@ type DashboardDrawerProps = {
 export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
   const pathname = usePathname();
   const [areMatchesOpen, setAreMatchesOpen] = useState(true);
+  const [generalThreads, setGeneralThreads] = useState<DashboardThread[]>([]);
   const [matchThreads, setMatchThreads] = useState<MatchThread[]>([]);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
+
+    async function loadGeneralThreads() {
+      try {
+        const response = await listDashboardThreadsRequest();
+
+        if (isMounted) {
+          setGeneralThreads(response.threads);
+          setIsLoadingThreads(false);
+        }
+      } catch {
+        if (isMounted) {
+          setGeneralThreads([]);
+          setIsLoadingThreads(false);
+        }
+      }
+    }
 
     async function loadMatchThreads() {
       try {
@@ -43,10 +56,20 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
       }
     }
 
+    function handleRefresh() {
+      setIsLoadingThreads(true);
+      setIsLoadingMatches(true);
+      void loadGeneralThreads();
+      void loadMatchThreads();
+    }
+
+    void loadGeneralThreads();
     void loadMatchThreads();
+    window.addEventListener("dashboard-chat:refresh", handleRefresh);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("dashboard-chat:refresh", handleRefresh);
     };
   }, []);
 
@@ -82,8 +105,32 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
             onClick={onClose}
           >
             <span aria-hidden="true">✦</span>
-            <span>Main Reflection</span>
+            <span>New Chat</span>
           </Link>
+
+          <div className={styles.drawerSectionLabel}>Recent Chats</div>
+          {generalThreads.length > 0 ? generalThreads.map((thread) => {
+            const href = `/dashboard/threads/${thread.id}`;
+            const isActive = pathname === href;
+
+            return (
+              <Link
+                className={isActive ? styles.drawerItemActive : styles.drawerItem}
+                href={href}
+                key={thread.id}
+                onClick={onClose}
+              >
+                <span aria-hidden="true">◌</span>
+                <span className={styles.drawerThreadName}>
+                  {thread.title ?? thread.latest_message_preview ?? "Untitled chat"}
+                </span>
+              </Link>
+            );
+          }) : (
+            <span className={styles.drawerEmptyText}>
+              {isLoadingThreads ? "Loading chats..." : "No recent chats yet"}
+            </span>
+          )}
 
           <button
             aria-expanded={areMatchesOpen}
@@ -133,26 +180,6 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
               )}
             </div>
           ) : null}
-
-          <div className={styles.drawerSectionLabel}>Agent Threads</div>
-          {agentThreads.map((thread) => {
-            const href = `/dashboard/threads/${thread.id}`;
-            const isActive = pathname === href;
-
-            return (
-              <Link
-                className={
-                  isActive ? styles.drawerItemActive : styles.drawerItem
-                }
-                href={href}
-                key={thread.id}
-                onClick={onClose}
-              >
-                <span aria-hidden="true">◌</span>
-                <span>{thread.label}</span>
-              </Link>
-            );
-          })}
 
           <div className={styles.drawerSectionLabel}>Account</div>
           <Link

@@ -3,46 +3,72 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import {
+  getDashboardMatchThreadRequest,
+  type DashboardMessage,
+  type DashboardThread,
+} from "@/lib/dashboard/chat-api";
 import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-api";
+
 import styles from "../page.module.scss";
+import { DashboardMessageList } from "./dashboard-message-list";
+import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 
 type MatchThreadViewProps = {
   matchId: string;
 };
 
 export function MatchThreadView({ matchId }: MatchThreadViewProps) {
+  const [thread, setThread] = useState<DashboardThread | null>(null);
+  const [messages, setMessages] = useState<DashboardMessage[]>([]);
   const [match, setMatch] = useState<MatchThread | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "missing" | "error">(
-    "loading",
-  );
+  const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadMatch() {
+    async function loadMatchThread() {
       setState("loading");
 
       try {
-        const response = await listMatchThreadsRequest();
-        const nextMatch =
-          response.threads.find((thread) => thread.id === matchId) ?? null;
+        const [threadResponse, matchResponse] = await Promise.all([
+          getDashboardMatchThreadRequest(matchId),
+          listMatchThreadsRequest(),
+        ]);
+        const nextMatch = threadResponse.matchContext
+          ? matchResponse.threads.find((entry) => entry.id === matchId) ?? null
+          : null;
 
         if (isMounted) {
+          setThread(threadResponse.thread);
+          setMessages(threadResponse.messages);
           setMatch(nextMatch);
           setState(nextMatch ? "ready" : "missing");
         }
       } catch {
         if (isMounted) {
+          setThread(null);
+          setMessages([]);
           setMatch(null);
           setState("error");
         }
       }
     }
 
-    void loadMatch();
+    function handleRefresh(event: Event) {
+      const detail = (event as CustomEvent<{ routeKind?: string; routeId?: string }>).detail;
+
+      if (!detail || (detail.routeKind === "match" && detail.routeId === matchId) || !detail.routeKind) {
+        void loadMatchThread();
+      }
+    }
+
+    void loadMatchThread();
+    window.addEventListener("dashboard-chat:refresh", handleRefresh);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("dashboard-chat:refresh", handleRefresh);
     };
   }, [matchId]);
 
@@ -57,7 +83,7 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
     );
   }
 
-  if (!match) {
+  if (!match || !thread) {
     return (
       <div className={styles.chatCanvas}>
         <section className={styles.messageCluster}>
@@ -88,10 +114,12 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       <section className={styles.messageCluster}>
         <div className={styles.assistantAvatar}>✦</div>
         <div className={styles.messageStack}>
-          <div className={styles.assistantBubble}>
-            I found someone worth looking at. {summary} Would you like to
-            explore what you two may have in common?
-          </div>
+          {messages.length === 0 ? (
+            <div className={styles.assistantBubble}>
+              I found someone worth looking at. {summary} Ask me what stands out, what you may have
+              in common, or how you might start the conversation.
+            </div>
+          ) : null}
 
           <article className={styles.matchFeatureCard}>
             <div className={styles.matchPhoto}>
@@ -114,9 +142,7 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
                   {match.label}
                   {match.age ? `, ${match.age}` : ""}
                 </h3>
-                <p className={styles.matchLocation}>
-                  {match.statusLabel ?? "Potential match"}
-                </p>
+                <p className={styles.matchLocation}>{match.statusLabel ?? "Potential match"}</p>
               </div>
               {tags.length > 0 ? (
                 <div className={styles.matchTags}>
@@ -132,12 +158,17 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
         </div>
       </section>
 
-      <section className={styles.userMessageRow}>
-        <div className={styles.userBubble}>
-          She seems interesting. Tell me more about the strongest overlap.
-        </div>
-        <div className={styles.userAvatar}>A</div>
-      </section>
+      {messages.length === 0 ? (
+        <DashboardSuggestionChips
+          prompts={[
+            "What stands out most about this person?",
+            "What could we realistically have in common?",
+            "What should I ask first if I message them?",
+          ]}
+        />
+      ) : null}
+
+      <DashboardMessageList messages={messages} />
     </div>
   );
 }

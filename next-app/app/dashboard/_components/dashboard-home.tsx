@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { listMatchThreadsRequest } from "@/lib/matches/match-api";
+import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 import styles from "../page.module.scss";
 
 export function DashboardHome() {
@@ -37,13 +38,21 @@ export function DashboardHome() {
   return (
     <div className={styles.chatCanvas}>
       <section className={styles.homeHero}>
-        <p className={styles.eyebrow}>Main Reflection</p>
-        <h2 className={styles.homeTitle}>What should Glint look into today?</h2>
+        <p className={styles.eyebrow}>New Chat</p>
+        <h2 className={styles.homeTitle}>What do you want help thinking through?</h2>
         <p className={styles.heroCopy}>
-          Your AI workspace is centered around conversations. Open the menu to
-          review new matches or continue an existing thread.
+          Start a fresh conversation here. Once you send your first message,
+          Glint will open a real chat thread and save it in your recent history.
         </p>
       </section>
+
+      <DashboardSuggestionChips
+        prompts={[
+          "Help me understand what I want in a relationship.",
+          "Can you help me think through a match I am unsure about?",
+          "What patterns should I notice in my dating life?",
+        ]}
+      />
 
       <section className={styles.insightCard}>
         <div>
@@ -58,8 +67,8 @@ export function DashboardHome() {
         </div>
         <p className={styles.insightCopy}>
           {hasMatches
-            ? "Open the Matches drawer to start a focused conversation about someone Glint found."
-            : "When Glint finds a new match, it will appear inside the Matches drawer as a conversation thread."}
+            ? "Open the Matches section when you want a focused conversation about someone Glint found."
+            : "When Glint finds a new match, it will appear in the Matches section so you can ask about them directly."}
         </p>
       </section>
     </div>
