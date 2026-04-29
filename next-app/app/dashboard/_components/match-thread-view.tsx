@@ -67,6 +67,7 @@ type MatchThreadViewProps = {
 export function MatchThreadView({ matchId }: MatchThreadViewProps) {
   const [thread, setThread] = useState<DashboardThread | null>(null);
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<DashboardMessage | null>(null);
   const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>(() =>
     getStoredPendingMessages(matchId),
   );
@@ -89,6 +90,16 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
         if (isMounted) {
           setThread(threadResponse.thread);
           setMessages(threadResponse.messages);
+          setOptimisticUserMessage((current) =>
+            current &&
+            threadResponse.messages.some(
+              (message) =>
+                message.id === current.id ||
+                (message.role === "user" && message.content === current.content),
+            )
+              ? null
+              : current,
+          );
           setMatch(nextMatch);
           setState(nextMatch ? "ready" : "missing");
         }
@@ -118,12 +129,17 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       const detail = (event as CustomEvent<{ source?: string; matchId?: string; message?: string }>).detail;
 
       if (detail?.source === "match" && detail.matchId === matchId && detail.message) {
+        setOptimisticUserMessage({
+          id: `optimistic-user-${Date.now()}`,
+          thread_id: thread?.id ?? "",
+          user_id: "",
+          role: "user",
+          content: detail.message,
+          status: "completed",
+          created_at: new Date().toISOString(),
+          metadata: {},
+        });
         setPendingMessages([
-          {
-            id: `pending-user-${Date.now()}`,
-            role: "user",
-            content: detail.message,
-          },
           {
             id: `pending-assistant-${Date.now()}`,
             role: "assistant",
@@ -173,6 +189,7 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
           threadId: string;
           routeKind: "thread" | "match";
           routeId: string;
+          userMessage: DashboardMessage | null;
           assistantMessage: DashboardMessage;
         }>
       ).detail;
@@ -182,12 +199,22 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       }
 
       setPendingMessages([]);
+      setOptimisticUserMessage(null);
       setMessages((current) => {
-        if (current.some((message) => message.id === detail.assistantMessage.id)) {
-          return current;
+        const nextMessages = [...current];
+
+        if (
+          detail.userMessage &&
+          !nextMessages.some((message) => message.id === detail.userMessage.id)
+        ) {
+          nextMessages.push(detail.userMessage);
         }
 
-        return [...current, detail.assistantMessage];
+        if (!nextMessages.some((message) => message.id === detail.assistantMessage.id)) {
+          nextMessages.push(detail.assistantMessage);
+        }
+
+        return nextMessages;
       });
       setThread((current) =>
         current
@@ -256,19 +283,6 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
 
   return (
     <div className={styles.chatCanvas}>
-      <section className={styles.threadHeader}>
-        <div>
-          <p className={styles.eyebrow}>Match Chat</p>
-          <h1 className={styles.threadTitleLarge}>
-            {match.label}
-            {match.age ? `, ${match.age}` : ""}
-          </h1>
-          <p className={styles.heroCopy}>
-            {summary}
-          </p>
-        </div>
-      </section>
-
       <article className={styles.matchFeatureCard}>
         <div className={styles.matchPhoto}>
           {match.profilePictureUrl ? (
@@ -316,6 +330,7 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
 
       <div className={styles.transcriptStack}>
         <DashboardMessageList messages={messages} />
+        {optimisticUserMessage ? <DashboardMessageList messages={[optimisticUserMessage]} /> : null}
       </div>
       <DashboardPendingMessageList messages={pendingMessages} />
     </div>

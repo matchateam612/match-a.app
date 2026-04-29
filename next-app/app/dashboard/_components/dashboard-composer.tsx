@@ -101,10 +101,19 @@ export function DashboardComposer() {
 
     try {
       let streamStarted = false;
+      let streamMeta:
+        | {
+            threadId: string;
+            routeKind: "thread" | "match";
+            routeId: string;
+            userMessage: DashboardMessage;
+          }
+        | null = null;
 
       await submitDashboardChatTurnStreamRequest(payload, {
         onMeta: (meta) => {
           streamStarted = true;
+          streamMeta = meta;
           setMessage("");
           persistPendingRoute(meta);
           window.dispatchEvent(
@@ -137,7 +146,10 @@ export function DashboardComposer() {
           clearPendingRoute();
           window.dispatchEvent(
             new CustomEvent("dashboard-chat:assistant-done", {
-              detail: donePayload,
+              detail: {
+                ...donePayload,
+                userMessage: streamMeta?.userMessage ?? null,
+              },
             }),
           );
           window.dispatchEvent(
@@ -162,7 +174,10 @@ export function DashboardComposer() {
         clearPendingRoute();
         window.dispatchEvent(
           new CustomEvent("dashboard-chat:assistant-done", {
-            detail: result,
+            detail: {
+              ...result,
+              userMessage: result.userMessage,
+            },
           }),
         );
         window.dispatchEvent(

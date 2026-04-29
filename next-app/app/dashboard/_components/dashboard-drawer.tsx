@@ -34,10 +34,6 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
     return thread.title ?? thread.latest_message_preview ?? "Untitled chat";
   }
 
-  function formatThreadSecondaryText(thread: DashboardThread) {
-    return thread.summary ?? thread.latest_message_preview ?? "No preview yet";
-  }
-
   function formatThreadTimestamp(value: string | null) {
     if (!value) {
       return "";
@@ -318,9 +314,6 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
                           {formatThreadTimestamp(thread.last_message_at)}
                         </span>
                       ) : null}
-                    </span>
-                    <span className={styles.drawerThreadPreview}>
-                      {formatThreadSecondaryText(thread)}
                     </span>
                   </span>
                 </Link>

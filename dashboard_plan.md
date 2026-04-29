@@ -12,6 +12,17 @@ Turn the dashboard from a mostly presentational shell into a real AI chat produc
 
 This document is the finalized implementation plan based on confirmed product decisions.
 
+## UI Overrides
+
+These UI decisions override any earlier plan language that conflicts with them.
+
+- Saved chat screens should be transcript-first and should not show a large hero block that repeats thread copy above the conversation.
+- Match chat screens should keep match context compact and should avoid large introductory text regions above the transcript.
+- General thread items in the drawer should show the thread title only. They should not show the assistant's latest reply preview under the title.
+- Thread management UI should live in the drawer item interaction model: hover on desktop and long-press on mobile.
+- The product should use permanent delete for chats rather than archive-and-restore UI.
+- Chat transitions should feel continuous: sending a message should not flash or reload the whole conversation view while the assistant reply is streaming.
+
 ## Final Product Decisions
 
 ### Conversation Types
@@ -99,7 +110,6 @@ Suggested columns:
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - `last_message_at timestamptz null`
-- `archived_at timestamptz null`
 - `summary text null`
 - `summary_updated_at timestamptz null`
 - `metadata jsonb not null default '{}'::jsonb`
@@ -411,15 +421,17 @@ Update the drawer to reflect the final product model.
 Sections:
 
 - `New Chat`
-- `Recent Chats`
 - `Matches`
+- `Recent Chats`
 - `Profile`
 - `Settings`
 
 Rules:
 
 - `New Chat` always routes to `/dashboard`
+- `Matches` appears above `Recent Chats`
 - `Recent Chats` lists general threads only
+- general thread items show title only
 - `Matches` lists match-scoped routes using `matchId`
 - only real threads with messages appear in history
 
@@ -442,6 +454,8 @@ Replace the current `Main Reflection` home content with:
 - loading and error states
 - composer
 - optimistic user messages if desired
+- no large header copy above the transcript
+- continuous streaming updates without full-view reloads
 
 ### Match Thread Screen
 
@@ -451,6 +465,7 @@ Replace the current `Main Reflection` home content with:
 - match intro card or match context header
 - suggested prompt chips for match-specific questions
 - composer
+- compact context framing only, not a large hero block above the transcript
 
 ## Summarization Strategy
 
@@ -524,10 +539,10 @@ This should stay secondary to the core chat implementation.
 
 1. replace placeholder drawer structure
 2. add `New Chat`
-3. add `Recent Chats`
-4. keep `Matches`
+3. put `Matches` before `Recent Chats`
+4. add `Recent Chats`
 5. remove placeholder `Agent Threads`
-6. show latest message previews and timestamps when ready
+6. show thread titles and timestamps without assistant preview text
 
 ### Phase 5: Match Chat MVP
 

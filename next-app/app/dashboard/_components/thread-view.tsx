@@ -65,6 +65,7 @@ type ThreadViewProps = {
 export function ThreadView({ threadId }: ThreadViewProps) {
   const [thread, setThread] = useState<DashboardThread | null>(null);
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<DashboardMessage | null>(null);
   const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>(() =>
     getStoredPendingMessages(threadId),
   );
@@ -80,6 +81,16 @@ export function ThreadView({ threadId }: ThreadViewProps) {
         if (isMounted) {
           setThread(response.thread);
           setMessages(response.messages);
+          setOptimisticUserMessage((current) =>
+            current &&
+            response.messages.some(
+              (message) =>
+                message.id === current.id ||
+                (message.role === "user" && message.content === current.content),
+            )
+              ? null
+              : current,
+          );
           setState("ready");
         }
       } catch (error) {
@@ -107,12 +118,17 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       const detail = (event as CustomEvent<{ threadId?: string; message?: string; routeKind?: string }>).detail;
 
       if (detail?.threadId === threadId && detail.message && (!detail.routeKind || detail.routeKind === "thread")) {
+        setOptimisticUserMessage({
+          id: `optimistic-user-${Date.now()}`,
+          thread_id: threadId,
+          user_id: "",
+          role: "user",
+          content: detail.message,
+          status: "completed",
+          created_at: new Date().toISOString(),
+          metadata: {},
+        });
         setPendingMessages([
-          {
-            id: `pending-user-${Date.now()}`,
-            role: "user",
-            content: detail.message,
-          },
           {
             id: `pending-assistant-${Date.now()}`,
             role: "assistant",
@@ -162,6 +178,7 @@ export function ThreadView({ threadId }: ThreadViewProps) {
           threadId: string;
           routeKind: "thread" | "match";
           routeId: string;
+          userMessage: DashboardMessage | null;
           assistantMessage: DashboardMessage;
         }>
       ).detail;
@@ -171,12 +188,22 @@ export function ThreadView({ threadId }: ThreadViewProps) {
       }
 
       setPendingMessages([]);
+      setOptimisticUserMessage(null);
       setMessages((current) => {
-        if (current.some((message) => message.id === detail.assistantMessage.id)) {
-          return current;
+        const nextMessages = [...current];
+
+        if (
+          detail.userMessage &&
+          !nextMessages.some((message) => message.id === detail.userMessage.id)
+        ) {
+          nextMessages.push(detail.userMessage);
         }
 
-        return [...current, detail.assistantMessage];
+        if (!nextMessages.some((message) => message.id === detail.assistantMessage.id)) {
+          nextMessages.push(detail.assistantMessage);
+        }
+
+        return nextMessages;
       });
       setThread((current) =>
         current
@@ -234,13 +261,6 @@ export function ThreadView({ threadId }: ThreadViewProps) {
 
   return (
     <div className={styles.chatCanvas}>
-      <section className={styles.threadHeader}>
-        <div>
-          <p className={styles.eyebrow}>Chat</p>
-          <h1 className={styles.threadTitleLarge}>{thread.title ?? "Recent chat"}</h1>
-        </div>
-      </section>
-
       {messages.length === 0 ? (
         <DashboardSuggestionChips
           prompts={[
@@ -253,6 +273,7 @@ export function ThreadView({ threadId }: ThreadViewProps) {
 
       <div className={styles.transcriptStack}>
         <DashboardMessageList messages={messages} />
+        {optimisticUserMessage ? <DashboardMessageList messages={[optimisticUserMessage]} /> : null}
       </div>
       <DashboardPendingMessageList messages={pendingMessages} />
     </div>
