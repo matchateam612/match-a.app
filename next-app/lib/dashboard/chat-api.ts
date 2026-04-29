@@ -70,6 +70,31 @@ export async function getDashboardThreadRequest(threadId: string) {
   }>(response);
 }
 
+export async function renameDashboardThreadRequest(threadId: string, title: string) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/dashboard/threads/${threadId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ title }),
+  });
+
+  return parseJsonResponse<{
+    thread: DashboardThread;
+  }>(response);
+}
+
+export async function archiveDashboardThreadRequest(threadId: string) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`/api/dashboard/threads/${threadId}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  return parseJsonResponse<{
+    thread: DashboardThread;
+  }>(response);
+}
+
 export async function getDashboardMatchThreadRequest(matchId: string) {
   const headers = await buildAuthHeaders();
   const response = await fetch(`/api/dashboard/matches/${matchId}/thread`, {

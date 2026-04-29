@@ -21,6 +21,15 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
+  function formatGeneralThreadLabel(thread: DashboardThread) {
+    return thread.title ?? thread.latest_message_preview ?? "Untitled chat";
+  }
+
+  function formatMatchLabel(thread: MatchThread) {
+    const ageSuffix = thread.age ? `, ${thread.age}` : "";
+    return `${thread.label}${ageSuffix}`;
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -122,7 +131,7 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
               >
                 <span aria-hidden="true">◌</span>
                 <span className={styles.drawerThreadName}>
-                  {thread.title ?? thread.latest_message_preview ?? "Untitled chat"}
+                  {formatGeneralThreadLabel(thread)}
                 </span>
               </Link>
             );
@@ -164,7 +173,7 @@ export function DashboardDrawer({ isOpen, onClose }: DashboardDrawerProps) {
                     key={thread.id}
                     onClick={onClose}
                   >
-                    <span className={styles.drawerThreadName}>{thread.label}</span>
+                    <span className={styles.drawerThreadName}>{formatMatchLabel(thread)}</span>
                     {thread.unread ? (
                       <span
                         aria-label="Unread match"

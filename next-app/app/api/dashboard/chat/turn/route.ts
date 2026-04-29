@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createOpenAiCompatibleChatCompletion } from "@/lib/llm/openai-compatible";
 import { extractAndSaveMemories } from "@/lib/dashboard/memory-extractor";
+import { buildThreadSummary } from "@/lib/dashboard/thread-summary";
 import { getLlmEnv } from "@/lib/llm/env";
 import { loadAgentTurnContext } from "@/lib/supabase/agent-context";
 import {
@@ -148,6 +149,7 @@ ${JSON.stringify(
       finalSummary: profile.agentProfile?.final_summary ?? null,
       savedMemories: memoryFacts,
       threadKind: context.thread.kind,
+      threadSummary: context.thread.summary ?? null,
       matchContext,
     },
     null,
@@ -158,7 +160,7 @@ ${JSON.stringify(
 async function generateAssistantReply(context: Awaited<ReturnType<typeof loadAgentTurnContext>>) {
   const recentMessages = await listMessagesForThread(context.thread.user_id, context.thread.id);
   const env = getLlmEnv();
-  const transcript = recentMessages.slice(-12).map((message) => ({
+  const transcript = recentMessages.slice(-10).map((message) => ({
     role: message.role,
     content: message.content,
   }));
@@ -236,6 +238,19 @@ export async function POST(request: Request) {
       source: body.source,
     });
     await touchThreadAfterMessage(user.id, threadId, compactText(assistantMessage.content));
+    const updatedMessages = await listMessagesForThread(user.id, threadId);
+
+    if (updatedMessages.length >= 6 && updatedMessages.length % 4 === 0) {
+      const summary = await buildThreadSummary(updatedMessages);
+
+      if (summary) {
+        await updateThreadForUser(user.id, threadId, {
+          summary,
+          summary_updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
     await extractAndSaveMemories({
       userId: user.id,
       sourceThreadId: threadId,

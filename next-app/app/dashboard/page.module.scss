@@ -402,6 +402,10 @@
   box-shadow: $shadow-soft;
 }
 
+.pendingBubble {
+  opacity: 0.72;
+}
+
 .userMessageRow {
   justify-content: flex-end;
 }
@@ -757,6 +761,12 @@
   color: var(--color-text-tertiary);
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+.inlineActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .memoryList {

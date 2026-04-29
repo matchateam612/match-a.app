@@ -67,12 +67,19 @@ export function DashboardComposer() {
     const nextMessage = message.trim();
     setIsSending(true);
     setReply(null);
+    const payload = {
+      ...resolvePayload(),
+      message: nextMessage,
+    };
+
+    window.dispatchEvent(
+      new CustomEvent("dashboard-chat:pending-start", {
+        detail: payload,
+      }),
+    );
 
     try {
-      const result = await submitDashboardChatTurnRequest({
-        ...resolvePayload(),
-        message: nextMessage,
-      });
+      const result = await submitDashboardChatTurnRequest(payload);
 
       setMessage("");
       window.dispatchEvent(
@@ -84,6 +91,7 @@ export function DashboardComposer() {
           },
         }),
       );
+      window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
 
       if (result.routeKind === "thread") {
         router.push(`/dashboard/threads/${result.threadId}`);
@@ -91,6 +99,7 @@ export function DashboardComposer() {
         router.push(`/dashboard/matches/${result.routeId}`);
       }
     } catch (error) {
+      window.dispatchEvent(new CustomEvent("dashboard-chat:pending-end"));
       setReply(error instanceof Error ? error.message : "We couldn't send that message.");
     } finally {
       setIsSending(false);

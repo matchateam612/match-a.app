@@ -129,10 +129,39 @@ function getCounterpartyUserId(match: MatchRecord, userId: string) {
   return match.user1 === userId ? match.user2 : match.user1;
 }
 
+function formatRelationshipIntent(intent: UserMatchesInfoRow["relationship_intent"]) {
+  if (!intent) {
+    return null;
+  }
+
+  return intent.replace(/_/g, " ");
+}
+
 async function buildMatchThreadTitle(match: MatchRecord, userId: string) {
-  void match;
-  void userId;
-  return "Match chat";
+  const counterpartyUserId = getCounterpartyUserId(match, userId);
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("user_matches_info")
+    .select("age, relationship_intent, ethnicity")
+    .eq("user_id", counterpartyUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const profile = (data as Pick<UserMatchesInfoRow, "age" | "relationship_intent" | "ethnicity"> | null) ?? null;
+  const descriptors = [
+    profile?.age ? `${profile.age}` : null,
+    formatRelationshipIntent(profile?.relationship_intent ?? null),
+    profile?.ethnicity ?? null,
+  ].filter(Boolean);
+
+  if (descriptors.length === 0) {
+    return "Match chat";
+  }
+
+  return `Match: ${descriptors.join(" • ")}`;
 }
 
 export async function findOrCreateMatchThread(userId: string, matchId: string) {

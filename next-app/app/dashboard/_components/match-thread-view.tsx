@@ -12,6 +12,10 @@ import { listMatchThreadsRequest, type MatchThread } from "@/lib/matches/match-a
 
 import styles from "../page.module.scss";
 import { DashboardMessageList } from "./dashboard-message-list";
+import {
+  DashboardPendingMessageList,
+  type PendingDashboardMessage,
+} from "./dashboard-pending-message-list";
 import { DashboardSuggestionChips } from "./dashboard-suggestion-chips";
 
 type MatchThreadViewProps = {
@@ -21,6 +25,7 @@ type MatchThreadViewProps = {
 export function MatchThreadView({ matchId }: MatchThreadViewProps) {
   const [thread, setThread] = useState<DashboardThread | null>(null);
   const [messages, setMessages] = useState<DashboardMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<PendingDashboardMessage[]>([]);
   const [match, setMatch] = useState<MatchThread | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
@@ -59,16 +64,44 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       const detail = (event as CustomEvent<{ routeKind?: string; routeId?: string }>).detail;
 
       if (!detail || (detail.routeKind === "match" && detail.routeId === matchId) || !detail.routeKind) {
+        setPendingMessages([]);
         void loadMatchThread();
       }
     }
 
+    function handlePendingStart(event: Event) {
+      const detail = (event as CustomEvent<{ source?: string; matchId?: string; message?: string }>).detail;
+
+      if (detail?.source === "match" && detail.matchId === matchId && detail.message) {
+        setPendingMessages([
+          {
+            id: `pending-user-${Date.now()}`,
+            role: "user",
+            content: detail.message,
+          },
+          {
+            id: `pending-assistant-${Date.now()}`,
+            role: "assistant",
+            content: "Glint is looking through this match...",
+          },
+        ]);
+      }
+    }
+
+    function handlePendingEnd() {
+      setPendingMessages([]);
+    }
+
     void loadMatchThread();
     window.addEventListener("dashboard-chat:refresh", handleRefresh);
+    window.addEventListener("dashboard-chat:pending-start", handlePendingStart);
+    window.addEventListener("dashboard-chat:pending-end", handlePendingEnd);
 
     return () => {
       isMounted = false;
       window.removeEventListener("dashboard-chat:refresh", handleRefresh);
+      window.removeEventListener("dashboard-chat:pending-start", handlePendingStart);
+      window.removeEventListener("dashboard-chat:pending-end", handlePendingEnd);
     };
   }, [matchId]);
 
@@ -169,6 +202,7 @@ export function MatchThreadView({ matchId }: MatchThreadViewProps) {
       ) : null}
 
       <DashboardMessageList messages={messages} />
+      <DashboardPendingMessageList messages={pendingMessages} />
     </div>
   );
 }

@@ -39,6 +39,16 @@ function formatRelationshipIntent(intent: UserMatchesInfoRow["relationship_inten
   return intent.replace(/_/g, " ");
 }
 
+function buildMatchLabel(profile: UserMatchesInfoRow | null, fallbackIndex: number) {
+  const descriptors = [
+    profile?.age ? `${profile.age}` : null,
+    formatRelationshipIntent(profile?.relationship_intent ?? null),
+    profile?.ethnicity ?? null,
+  ].filter(Boolean);
+
+  return descriptors.length > 0 ? descriptors.join(" • ") : `Match ${fallbackIndex}`;
+}
+
 export async function GET(request: Request) {
   try {
     const user = await requireAuthenticatedUser(request);
@@ -98,7 +108,7 @@ export async function GET(request: Request) {
 
         return {
           id: match.id,
-          label: `Match ${index + 1}`,
+          label: buildMatchLabel(profile, index + 1),
           targetUserId,
           age: profile?.age ?? null,
           genderIdentity: profile?.gender_identity ?? null,
